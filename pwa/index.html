@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2C5F2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Nivesh Diary">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Nivesh Diary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+/* ── DESIGN TOKENS ──────────────────────────────── */
+:root {
+  --bg:         #FBF8F3;
+  --surface:    #FFFFFF;
+  --surface2:   #F5F0E8;
+  --border:     #E4DDD0;
+  --border2:    #D4CAB8;
+  --text:       #1C1A16;
+  --text2:      #4A4540;
+  --muted:      #7A7265;
+  --accent:     #2C5F2E;
+  --accent2:    #1e4220;
+  --accent-lt:  #E8F3E8;
+  --amber:      #92400E;
+  --amber-lt:   #FEF3C7;
+  --red:        #991B1B;
+  --red-lt:     #FEE2E2;
+  --gold:       #78350F;
+  --gold-lt:    #FDE68A;
+  --blue:       #1e40af;
+  --blue-lt:    #DBEAFE;
+  --r:          14px;
+  --r-sm:       10px;
+  --r-pill:     100px;
+  --shadow:     0 1px 4px rgba(28,26,22,0.08);
+  --shadow-lg:  0 8px 32px rgba(28,26,22,0.14);
+}
+
+/* ── RESET ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow-x: hidden;
+  position: relative;
+}
+input, select, textarea, button { font-family: inherit; }
+
+/* ── TOP NAV ──────────────────────────────────── */
+.topnav {
+  position: sticky; top: 0; z-index: 90;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--accent); display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.brand-text { line-height: 1.2; }
+.brand-name { font-family: 'Lora', serif; font-size: 17px; font-weight: 700; color: var(--accent); }
+.brand-sub  { font-size: 11px; color: var(--muted); }
+.nav-actions { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px;
+}
+.notif-badge-wrap { position: relative; }
+.notif-dot {
+  position: absolute; top: -3px; right: -3px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--red); border: 2px solid var(--surface);
+  display: none;
+}
+.notif-dot.show { display: block; }
+
+/* ── BOTTOM TABS ────────────────────────────── */
+.tabs {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px; z-index: 90;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 9px 4px 11px; cursor: pointer;
+  border: none; background: none;
+  font-size: 10.5px; color: var(--muted);
+  transition: color 0.15s; position: relative;
+}
+.tab.active { color: var(--accent); }
+.tab-icon { font-size: 20px; margin-bottom: 3px; }
+.tab-badge {
+  position: absolute; top: 5px; right: calc(50% - 18px);
+  background: var(--red); color: white;
+  font-size: 9px; font-weight: 700;
+  min-width: 16px; height: 16px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px; border: 2px solid var(--surface);
+}
+
+/* ── PAGES ──────────────────────────────────── */
+.page { display: none; padding: 16px 16px 96px; animation: fadeUp 0.18s ease; }
+.page.active { display: block; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── SECTION HEADING ─────────────────────────── */
+.sec-head {
+  font-family: 'Lora', serif; font-size: 15px; font-weight: 600;
+  color: var(--text); margin: 18px 0 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.pill {
+  font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600;
+  padding: 2px 10px; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.pill-green  { background: var(--accent-lt); color: var(--accent); }
+.pill-amber  { background: var(--amber-lt);  color: var(--amber);  }
+.pill-red    { background: var(--red-lt);    color: var(--red);    }
+.pill-blue   { background: var(--blue-lt);   color: var(--blue);   }
+.pill-gold   { background: var(--gold-lt);   color: var(--gold);   }
+
+/* ── STAT CARDS ─────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+.stat-card {
+  background: var(--surface); border-radius: var(--r);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+}
+.stat-card.wide { grid-column: span 2; }
+.stat-lbl { font-size: 11.5px; color: var(--muted); margin-bottom: 5px; }
+.stat-val { font-family: 'Lora', serif; font-size: 22px; font-weight: 700; }
+.stat-val.green  { color: var(--accent); }
+.stat-val.amber  { color: var(--amber);  }
+.stat-val.red    { color: var(--red);    }
+.stat-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* ── ALERT BANNERS ───────────────────────────── */
+.alert-banner {
+  border-radius: var(--r-sm); padding: 12px 14px;
+  margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start;
+}
+.alert-banner.red    { background: var(--red-lt);    border-left: 4px solid var(--red);   }
+.alert-banner.amber  { background: var(--amber-lt);  border-left: 4px solid #D97706;      }
+.alert-banner.gold   { background: var(--gold-lt);   border-left: 4px solid #B45309;      }
+.alert-banner.green  { background: var(--accent-lt); border-left: 4px solid var(--accent);}
+.alert-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+.alert-body { flex: 1; }
+.alert-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.alert-desc  { font-size: 12.5px; line-height: 1.5; color: var(--text2); }
+
+/* ── INVESTMENT CARD ─────────────────────────── */
+.inv-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-user-select: none; user-select: none;
+}
+.inv-card:active { border-color: var(--accent); box-shadow: var(--shadow); }
+.inv-card-top {
+  padding: 14px 16px 12px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.inv-card-left { flex: 1; min-width: 0; }
+.inv-name {
+  font-family: 'Lora', serif; font-size: 15.5px; font-weight: 600;
+  margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inv-source { font-size: 12px; color: var(--muted); }
+.inv-card-right { text-align: right; flex-shrink: 0; padding-left: 10px; }
+.inv-amount { font-family: 'Lora', serif; font-size: 16px; font-weight: 700; color: var(--accent); }
+.inv-rate   { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.inv-card-bottom {
+  padding: 9px 16px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.inv-mat-label { font-size: 12px; color: var(--muted); }
+.inv-mat-date  { font-size: 12.5px; font-weight: 600; }
+.mat-chip {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: var(--r-pill);
+}
+.mat-chip.urgent   { background: var(--red-lt);    color: var(--red);    }
+.mat-chip.soon     { background: var(--amber-lt);  color: var(--amber);  }
+.mat-chip.upcoming { background: var(--gold-lt);   color: var(--gold);   }
+.mat-chip.safe     { background: var(--accent-lt); color: var(--accent); }
+.mat-chip.matured  { background: #F3F4F6;           color: var(--muted);  }
+
+/* ── FILTER CHIPS ─────────────────────────── */
+.filters {
+  display: flex; gap: 7px; overflow-x: auto;
+  padding: 2px 0 10px; scrollbar-width: none;
+  margin-bottom: 4px;
+}
+.filters::-webkit-scrollbar { display: none; }
+.fchip {
+  flex-shrink: 0; padding: 7px 14px; border-radius: var(--r-pill);
+  border: 1.5px solid var(--border); background: var(--surface);
+  font-size: 12.5px; font-weight: 500; cursor: pointer;
+  color: var(--muted); transition: all 0.15s; white-space: nowrap;
+}
+.fchip.on { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* ── EMPTY STATE ─────────────────────────── */
+.empty-state {
+  text-align: center; padding: 52px 24px 32px;
+  color: var(--muted);
+}
+.empty-icon { font-size: 52px; margin-bottom: 14px; }
+.empty-state h3 { font-family: 'Lora', serif; font-size: 18px; color: var(--text); margin-bottom: 8px; }
+.empty-state p  { font-size: 14px; line-height: 1.65; }
+
+/* ── FORM ───────────────────────────────── */
+.form-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 20px 18px; margin-bottom: 14px;
+}
+.form-heading { font-family: 'Lora', serif; font-size: 17px; margin-bottom: 20px; }
+.field { margin-bottom: 16px; }
+.field > label {
+  display: block; font-size: 13px; font-weight: 500;
+  color: var(--muted); margin-bottom: 7px; letter-spacing: 0.01em;
+}
+.field input, .field select, .field textarea {
+  width: 100%; padding: 13px 14px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border); background: var(--bg);
+  font-size: 16px; color: var(--text); outline: none;
+  transition: border-color 0.15s; -webkit-appearance: none; appearance: none;
+}
+.field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A7265' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); background: white; }
+.field textarea { resize: none; line-height: 1.5; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+.field-hint.green { color: var(--accent); font-weight: 500; }
+.computed-val {
+  padding: 13px 14px; border-radius: var(--r-sm);
+  background: var(--accent-lt); border: 1.5px solid #B8D9B9;
+  font-size: 16px; font-weight: 600; color: var(--accent);
+}
+
+/* ── BUTTONS ─────────────────────────────── */
+.btn {
+  display: block; width: 100%; padding: 15px;
+  border-radius: var(--r); border: none; cursor: pointer;
+  font-size: 15.5px; font-weight: 600;
+  transition: all 0.15s; text-align: center;
+}
+.btn + .btn { margin-top: 10px; }
+.btn-primary   { background: var(--accent); color: white; }
+.btn-primary:active { background: var(--accent2); }
+.btn-outline   { background: white; color: var(--accent); border: 1.5px solid var(--accent); }
+.btn-secondary { background: var(--surface2); color: var(--text2); border: 1.5px solid var(--border); }
+.btn-danger    { background: var(--red-lt); color: var(--red); border: 1.5px solid #FCA5A5; }
+.btn-whatsapp  { background: #25D366; color: white; }
+.btn-email     { background: var(--blue-lt); color: var(--blue); border: 1.5px solid #BFDBFE; }
+.btn-sm {
+  padding: 9px 18px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--text2);
+}
+
+/* ── MODAL ──────────────────────────────── */
+.overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(20,18,14,0.55); backdrop-filter: blur(3px);
+}
+.overlay.open { display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  background: var(--surface); border-radius: 22px 22px 0 0;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+  animation: slideUp 0.22s cubic-bezier(0.32,0.72,0,1);
+}
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0.7; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border2); margin: 0 auto 18px;
+}
+.sheet-close {
+  position: absolute; top: 14px; right: 18px;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; background: var(--surface2); cursor: pointer;
+  font-size: 15px; display: flex; align-items: center; justify-content: center;
+}
+
+/* ── DETAIL VIEW ─────────────────────────── */
+.detail-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px;
+}
+.detail-title { font-family: 'Lora', serif; font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.detail-source { font-size: 13px; color: var(--muted); }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.detail-row {
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-row.full { grid-column: span 2; }
+.d-lbl { font-size: 11.5px; color: var(--muted); }
+.d-val { font-size: 15px; font-weight: 500; }
+.detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+.detail-share { margin-top: 14px; }
+
+/* ── SORT BAR ─────────────────────────── */
+.sort-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.sort-bar label { font-size: 13px; color: var(--muted); }
+.sort-bar select {
+  font-size: 13px; border: 1px solid var(--border);
+  background: var(--surface); border-radius: var(--r-sm);
+  padding: 6px 10px; color: var(--text); outline: none;
+}
+
+/* ── SETTINGS / BACKUP ──────────────────── */
+.setting-row {
+  padding: 16px 0; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.setting-row:last-child { border-bottom: none; }
+.s-label { font-size: 14px; font-weight: 500; }
+.s-desc  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ── INSTALL BANNER ─────────────────────── */
+.install-banner {
+  background: var(--accent); color: white;
+  border-radius: var(--r); padding: 14px 16px;
+  margin-bottom: 14px; display: flex; gap: 12px;
+  align-items: center; cursor: pointer;
+}
+.install-banner p { font-size: 13px; line-height: 1.5; }
+.install-banner strong { display: block; font-size: 14px; margin-bottom: 2px; }
+#install-banner { display: none; }
+
+/* ── TOAST ──────────────────────────────── */
+.toast {
+  position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--text); color: white; padding: 11px 22px;
+  border-radius: var(--r); font-size: 14px; z-index: 400;
+  opacity: 0; transition: all 0.25s; white-space: nowrap; pointer-events: none;
+  box-shadow: var(--shadow-lg);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── NOTIFICATION PERMISSION ─────────────── */
+.notif-prompt {
+  background: var(--blue-lt); border: 1px solid #BFDBFE;
+  border-radius: var(--r-sm); padding: 14px 16px; margin-bottom: 14px;
+  display: none;
+}
+.notif-prompt.show { display: flex; gap: 12px; align-items: flex-start; }
+
+/* ── DIVIDER ─────────────────────────────── */
+hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="brand">
+    <div class="brand-logo">📒</div>
+    <div class="brand-text">
+      <div class="brand-name">Nivesh Diary</div>
+      <div class="brand-sub">Investment Record Book</div>
+    </div>
+  </div>
+  <div class="nav-actions">
+    <div class="notif-badge-wrap">
+      <div class="icon-btn" onclick="showPage('alerts')" title="Alerts">🔔</div>
+      <div class="notif-dot" id="notif-dot"></div>
+    </div>
+    <div class="icon-btn" onclick="openSheet('backup-sheet')" title="Backup">⚙️</div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════ -->
+<!-- PAGE: DASHBOARD                     -->
+<!-- ═══════════════════════════════════ -->
+<div class="page active" id="page-home">
+
+  <!-- Install banner (shown when PWA can be installed) -->
+  <div class="install-banner" id="install-banner" onclick="installPWA()">
+    <span style="font-size:28px">📲</span>
+    <div>
+      <strong>Add to Home Screen</strong>
+      <p>Install this app for quick access and notifications</p>
+    </div>
+  </div>
+
+  <!-- Notification permission prompt -->
+  <div class="notif-prompt" id="notif-prompt">
+    <span style="font-size:22px">🔔</span>
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">Enable maturity reminders</div>
+      <div style="font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:10px">Get notified before your investments mature, even when the app is closed.</div>
+      <button class="btn-sm" onclick="requestNotifPermission()" style="background:var(--accent);color:white;border-color:var(--accent)">Allow notifications</button>
+      <button class="btn-sm" onclick="dismissNotifPrompt()" style="margin-left:8px">Not now</button>
+    </div>
+  </div>
+
+  <!-- Alert zone -->
+  <div id="home-alerts"></div>
+
+  <!-- Stats -->
+  <div class="stats-grid" id="home-stats"></div>
+
+  <!-- Upcoming -->
+  <div class="sec-head">
+    Upcoming Maturities
+    <span class="pill pill-amber" id="upcoming-count-pill"></span>
+  </div>
+  <div id="home-upcoming"></div>
+
+  <!-- Recent -->
+  <div class="sec-head">Recent Investments</div>
+  <div id="home-recent"></div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- PAGE: MY INVESTMENTS               -->
+<!-- ═══════════════════════════════════ -->
+<div class="page" id="page-list">
+  <div class="filters" id="list-filters">
+    <button class="fchip on" data-f="all"  onclick="setFilter(this)">All</button>
+    <button class="fchip"    data-f="FD"   onclick="setFilter(this)">Fixed Deposit</button>
+    <button class="fchip"    data-f="RD"   onclick="setFilter(this)">Recurring Dep.</button>
+    <button class="fchip"    data-f="TD"   onclick="setFilter(this)">Term Deposit</button>
+    <button class="fchip"    data-f="NSC"  onclick="setFilter(this)">NSC</button>
+    <button class="fchip"    data-f="KVP"  onclick="setFilter(this)">KVP</button>
+    <button class="fchip"    data-f="MIS"  onclick="setFilter(this)">MIS</button>
+    <button class="fchip"    data-f="PPF"  onclick="setFilter(this)">PPF</button>
+    <button class="fchip"    data-f="SCSS" onclick="setFilter(this)">SCSS</button>
+    <button class="fchip"    data-f="Bond" onclick="setFilter(this)">Bond</button>
+    <button class="fchip"    data-f="Other" onclick="setFilter(this)">Other</button>
+  </div>
+  <div class="sort-bar">
+    <label>Sort by</label>
+    <select onchange="currentSort=this.value; renderList()">
+      <option value="maturity">Maturity date</option>
+      <option value="amount">Amount (high-low)</option>
+      <option value="added">Recently added</option>
+    </select>
+  </div>
+  <div id="list-body"></div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- PAGE: ADD / EDIT                   -->
+<!-- ═══════════════════════════════════ -->
+<div class="page" id="page-add">
+  <div class="form-wrap">
+    <div class="form-heading" id="form-heading">📝 Add New Investment</div>
+
+    <div class="field">
+      <label>Investment type *</label>
+      <select id="f-type" onchange="onTypeChange()">
+        <option value="">— Select type —</option>
+        <option value="FD">Fixed Deposit (FD)</option>
+        <option value="RD">Recurring Deposit (RD)</option>
+        <option value="TD">Term Deposit — Post Office</option>
+        <option value="NSC">National Savings Certificate (NSC)</option>
+        <option value="KVP">Kisan Vikas Patra (KVP)</option>
+        <option value="MIS">Post Office Monthly Income Scheme (MIS)</option>
+        <option value="PPF">Public Provident Fund (PPF)</option>
+        <option value="SCSS">Senior Citizens Savings Scheme (SCSS)</option>
+        <option value="Bond">Savings Bond / GoI Bond</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="field" id="type-info-box" style="display:none">
+      <div class="computed-val" id="type-info-text" style="background:var(--blue-lt);border-color:#BFDBFE;color:var(--blue);font-size:13px;font-weight:400;line-height:1.5"></div>
+    </div>
+
+    <div class="field">
+      <label>Bank / Institution *</label>
+      <select id="f-source" onchange="toggleOtherSource()">
+        <option value="">— Select institution —</option>
+        <optgroup label="Public Sector Banks">
+          <option>State Bank of India (SBI)</option>
+          <option>Bank of Baroda</option>
+          <option>Punjab National Bank (PNB)</option>
+          <option>Canara Bank</option>
+          <option>Union Bank of India</option>
+          <option>Bank of India</option>
+          <option>Central Bank of India</option>
+          <option>Indian Bank</option>
+          <option>UCO Bank</option>
+          <option>Indian Overseas Bank</option>
+          <option>Bank of Maharashtra</option>
+        </optgroup>
+        <optgroup label="Private Banks">
+          <option>HDFC Bank</option>
+          <option>ICICI Bank</option>
+          <option>Axis Bank</option>
+          <option>Kotak Mahindra Bank</option>
+          <option>IndusInd Bank</option>
+          <option>Yes Bank</option>
+          <option>IDFC First Bank</option>
+          <option>Federal Bank</option>
+          <option>Karur Vysya Bank</option>
+          <option>City Union Bank</option>
+        </optgroup>
+        <optgroup label="Small Finance Banks">
+          <option>AU Small Finance Bank</option>
+          <option>Ujjivan Small Finance Bank</option>
+          <option>Jana Small Finance Bank</option>
+          <option>ESAF Small Finance Bank</option>
+          <option>Suryoday Small Finance Bank</option>
+          <option>Utkarsh Small Finance Bank</option>
+        </optgroup>
+        <optgroup label="Government / Post Office">
+          <option>India Post / Post Office</option>
+          <option>Government of India (GoI)</option>
+          <option>RBI Retail Direct</option>
+        </optgroup>
+        <option value="Other">Other (enter below)</option>
+      </select>
+    </div>
+    <div class="field" id="source-other" style="display:none">
+      <label>Institution name</label>
+      <input type="text" id="f-source-custom" placeholder="e.g. Saraswat Co-op Bank">
+    </div>
+
+    <div class="field">
+      <label>Certificate / Account number <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+      <input type="text" id="f-accno" placeholder="e.g. FD-2024-001 or certificate no.">
+    </div>
+
+    <div class="field">
+      <label>Principal amount (₹) *</label>
+      <input type="number" id="f-principal" placeholder="0" inputmode="numeric" min="1" oninput="calcMaturity()">
+    </div>
+
+    <div class="field" id="f-monthly-wrap" style="display:none">
+      <label>Monthly instalment (₹)</label>
+      <input type="number" id="f-monthly" placeholder="e.g. 5000" inputmode="numeric">
+    </div>
+
+    <div class="field">
+      <label>Interest rate <span style="font-weight:400;color:var(--muted)">% per annum (optional)</span></label>
+      <input type="number" id="f-rate" placeholder="e.g. 7.10" step="0.01" inputmode="decimal" oninput="calcMaturity()">
+      <div class="field-hint" id="f-rate-hint"></div>
+    </div>
+
+    <div class="field">
+      <label>Start / issue date *</label>
+      <input type="date" id="f-start" onchange="calcMaturity()">
+    </div>
+
+    <div class="field" id="tenure-wrap">
+      <label>Tenure <span style="font-weight:400;color:var(--muted)">(fill this OR the maturity date)</span></label>
+      <div class="field-row">
+        <input type="number" id="f-y" placeholder="Years" min="0" max="30" inputmode="numeric" oninput="calcMaturity()">
+        <input type="number" id="f-m" placeholder="Months" min="0" max="11" inputmode="numeric" oninput="calcMaturity()">
+      </div>
+      <div class="field-hint" id="scheme-hint"></div>
+    </div>
+
+    <div class="field">
+      <label>Maturity date *</label>
+      <div id="maturity-computed" style="display:none" class="computed-val"></div>
+      <input type="date" id="f-maturity" oninput="onMaturityManual()">
+      <div class="field-hint green" id="days-left-hint"></div>
+    </div>
+
+    <div class="field">
+      <label>Expected maturity amount (₹) <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+      <div id="maturity-amt-computed" style="display:none" class="computed-val"></div>
+      <input type="number" id="f-matamt" placeholder="e.g. 141478" inputmode="numeric">
+      <div class="field-hint" id="mat-amt-hint"></div>
+    </div>
+
+    <div class="field">
+      <label>Reminder alert <span style="font-weight:400;color:var(--muted)">(days before maturity)</span></label>
+      <select id="f-reminder">
+        <option value="90">90 days before</option>
+        <option value="60">60 days before</option>
+        <option value="30" selected>30 days before</option>
+        <option value="15">15 days before</option>
+        <option value="7">7 days before</option>
+        <option value="0">On maturity date</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+      <textarea id="f-notes" rows="2" placeholder="e.g. Linked to SBI account XXXX1234. Auto-renewal disabled."></textarea>
+    </div>
+
+    <button class="btn btn-primary" id="save-btn" onclick="saveInvestment()">Save Investment</button>
+    <button class="btn btn-secondary" onclick="cancelForm()">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- PAGE: ALERTS                       -->
+<!-- ═══════════════════════════════════ -->
+<div class="page" id="page-alerts">
+  <div class="sec-head">Maturity Alerts</div>
+  <div id="alerts-body"></div>
+
+  <div class="sec-head" style="margin-top:24px">Send Summary</div>
+  <div style="display:grid;gap:10px">
+    <button class="btn btn-whatsapp" onclick="shareWhatsApp()">📲 Share via WhatsApp</button>
+    <button class="btn btn-email"    onclick="shareEmail()">📧 Send Email Summary</button>
+  </div>
+</div>
+
+<!-- BOTTOM TABS -->
+<div class="tabs">
+  <button class="tab active" id="tab-home"   onclick="showPage('home')">
+    <span class="tab-icon">🏠</span>Dashboard
+  </button>
+  <button class="tab" id="tab-list"   onclick="showPage('list')">
+    <span class="tab-icon">📋</span>Investments
+  </button>
+  <button class="tab" id="tab-add"    onclick="newInvestment()">
+    <span class="tab-icon">➕</span>Add New
+  </button>
+  <button class="tab" id="tab-alerts" onclick="showPage('alerts')">
+    <span class="tab-icon">🔔</span>Alerts
+    <span class="tab-badge" id="alert-badge" style="display:none">0</span>
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- DETAIL SHEET                       -->
+<!-- ═══════════════════════════════════ -->
+<div class="overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="sheet" id="detail-sheet">
+    <div class="sheet-handle"></div>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- BACKUP SHEET                       -->
+<!-- ═══════════════════════════════════ -->
+<div class="overlay" id="backup-overlay" onclick="closeSheet(event,'backup-overlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 style="font-family:'Lora',serif;font-size:18px;margin-bottom:6px">Backup &amp; Settings</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6">Keep a copy of your investment data safe. Backup regularly and store in Google Drive or WhatsApp.</p>
+
+    <div class="setting-row">
+      <div><div class="s-label">Export data (JSON)</div><div class="s-desc">Download all investments to your phone</div></div>
+      <button class="btn-sm" onclick="exportData()" style="background:var(--accent);color:white;border-color:var(--accent)">Export</button>
+    </div>
+    <div class="setting-row">
+      <div><div class="s-label">Import data (JSON)</div><div class="s-desc">Restore from a backup file</div></div>
+      <button class="btn-sm" onclick="document.getElementById('import-input').click()">Import</button>
+    </div>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+
+    <div class="setting-row">
+      <div><div class="s-label">Notifications</div><div class="s-desc" id="notif-status-text">Tap to enable maturity reminders</div></div>
+      <button class="btn-sm" id="notif-toggle-btn" onclick="toggleNotifications()">Enable</button>
+    </div>
+
+    <hr>
+    <div class="setting-row" style="border:none">
+      <div><div class="s-label" style="color:var(--red)">Delete all data</div><div class="s-desc">Permanently remove all investments</div></div>
+      <button class="btn-sm" style="color:var(--red);border-color:#FECACA" onclick="confirmDeleteAll()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════
+   DATA & STORAGE
+═══════════════════════════════════════════ */
+const STORE_KEY = 'nivesh_diary_v2';
+let data = { investments: [], settings: { reminderDays: 30, notifEnabled: false } };
+let editingId = null;
+let currentFilter = 'all';
+let currentSort = 'maturity';
+let deferredInstallPrompt = null;
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) data = JSON.parse(raw);
+    if (!data.investments) data.investments = [];
+    if (!data.settings) data.settings = { reminderDays: 30, notifEnabled: false };
+  } catch(e) {}
+}
+function save() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+}
+
+/* ════════════════════════════════════════
+   SCHEME INFO & DEFAULTS
+═══════════════════════════════════════════ */
+const SCHEME_INFO = {
+  FD:   { label: 'Fixed Deposit', info: 'Lump sum deposited for a fixed term. Interest paid at maturity or periodically.' },
+  RD:   { label: 'Recurring Deposit', info: 'Monthly instalments for a fixed period. Enter total principal (instalments × months).' },
+  TD:   { label: 'Post Office Term Deposit', info: 'Available for 1, 2, 3 or 5 year terms. 5-year TD gets Section 80C benefit.' },
+  NSC:  { label: 'National Savings Certificate', info: 'GoI scheme with 5-year lock-in. Interest compounds annually, taxable but eligible for 80C.' },
+  KVP:  { label: 'Kisan Vikas Patra', info: 'Investment doubles in ~115 months (9 yrs 7 months) at current rates. No fixed interest — enter maturity amount as 2× principal.' },
+  MIS:  { label: 'Post Office MIS', info: 'Monthly interest payout scheme, 5-year maturity. Principal is returned at maturity.' },
+  PPF:  { label: 'Public Provident Fund', info: '15-year lock-in. Tax-free interest (EEE status). Can be extended in blocks of 5 years.' },
+  SCSS: { label: 'Senior Citizens Savings Scheme', info: '5-year tenure. Highest guaranteed returns for senior citizens. Eligible for 80C.' },
+  Bond: { label: 'Savings Bond / GoI Bond', info: 'Sovereign Gold Bonds, Floating Rate Bonds, etc. Enter maturity date as specified on certificate.' },
+  Other:{ label: 'Other investment', info: '' }
+};
+
+const SCHEME_TENURE = {
+  NSC: { y: 5, m: 0 }, MIS: { y: 5, m: 0 }, SCSS: { y: 5, m: 0 },
+  KVP: { y: 9, m: 7 }, PPF: { y: 15, m: 0 }
+};
+
+/* ════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════ */
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'home')   renderHome();
+  if (name === 'list')   renderList();
+  if (name === 'alerts') renderAlerts();
+}
+
+/* ════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════ */
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  return '₹' + Number(n).toLocaleString('en-IN');
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return day + ' ' + months[parseInt(m)-1] + ' ' + y;
+}
+function daysLeft(matDate) {
+  if (!matDate) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const mat = new Date(matDate); mat.setHours(0,0,0,0);
+  return Math.ceil((mat - now) / 86400000);
+}
+function maturityClass(dl) {
+  if (dl === null) return 'safe';
+  if (dl < 0) return 'matured';
+  if (dl <= 30) return 'urgent';
+  if (dl <= 60) return 'soon';
+  if (dl <= 90) return 'upcoming';
+  return 'safe';
+}
+function maturityLabel(dl) {
+  if (dl === null) return '';
+  if (dl < 0) return 'Matured';
+  if (dl === 0) return '🔴 Matures today!';
+  if (dl === 1) return '🔴 Tomorrow!';
+  if (dl <= 30) return '🔴 ' + dl + ' days left';
+  if (dl <= 60) return '🟡 ' + dl + ' days left';
+  if (dl <= 90) return '🟠 ' + dl + ' days left';
+  return dl + ' days left';
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+function addMonths(dateStr, months) {
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().split('T')[0];
+}
+
+/* ════════════════════════════════════════
+   RENDER HOME
+═══════════════════════════════════════════ */
+function renderHome() {
+  const invs = data.investments;
+  const total = invs.reduce((s, i) => s + Number(i.principal || 0), 0);
+  const upcoming = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; });
+  const urgent   = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; });
+
+  document.getElementById('home-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-lbl">Total Invested</div>
+      <div class="stat-val green">${fmt(total)}</div>
+      <div class="stat-sub">${invs.length} investment${invs.length !== 1 ? 's' : ''}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Maturing in 90 days</div>
+      <div class="stat-val ${urgent.length ? 'red' : 'amber'}">${upcoming.length}</div>
+      <div class="stat-sub">${urgent.length} urgent (≤30 days)</div>
+    </div>
+    <div class="stat-card wide">
+      <div class="stat-lbl">Expected maturity value (of tracked)</div>
+      <div class="stat-val green">${fmt(invs.reduce((s,i) => s + Number(i.matamt || i.principal || 0), 0))}</div>
+      <div class="stat-sub">across ${invs.filter(i=>i.matamt).length} investments with known returns</div>
+    </div>
+  `;
+
+  // Alert banners
+  let alerts = '';
+  if (urgent.length) {
+    alerts += `<div class="alert-banner red">
+      <div class="alert-icon">🚨</div>
+      <div class="alert-body">
+        <div class="alert-title">${urgent.length} investment${urgent.length>1?'s':''} maturing within 30 days!</div>
+        <div class="alert-desc">${urgent.map(i => `${i.name} (${fmtDate(i.maturity)})`).join(', ')}. Visit Alerts tab to take action.</div>
+      </div>
+    </div>`;
+  }
+  const soon60 = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; });
+  if (soon60.length) {
+    alerts += `<div class="alert-banner amber">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-body">
+        <div class="alert-title">${soon60.length} maturing in 31–60 days</div>
+        <div class="alert-desc">${soon60.map(i => i.name).join(', ')}</div>
+      </div>
+    </div>`;
+  }
+  const matured = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; });
+  if (matured.length) {
+    alerts += `<div class="alert-banner green">
+      <div class="alert-icon">✅</div>
+      <div class="alert-body">
+        <div class="alert-title">${matured.length} investment${matured.length>1?'s':''} already matured</div>
+        <div class="alert-desc">Please update or archive: ${matured.map(i=>i.name).join(', ')}</div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('home-alerts').innerHTML = alerts;
+
+  // Upcoming list
+  const pill = document.getElementById('upcoming-count-pill');
+  pill.textContent = upcoming.length || '';
+  pill.style.display = upcoming.length ? '' : 'none';
+
+  const sorted = [...upcoming].sort((a, b) => new Date(a.maturity) - new Date(b.maturity));
+  document.getElementById('home-upcoming').innerHTML = sorted.length
+    ? sorted.map(i => invCard(i)).join('')
+    : `<div style="padding:16px;text-align:center;color:var(--muted);font-size:14px">No maturities in the next 90 days 🎉</div>`;
+
+  // Recent (last 4)
+  const recent = [...invs].sort((a,b) => b.addedAt - a.addedAt).slice(0, 4);
+  document.getElementById('home-recent').innerHTML = recent.length
+    ? recent.map(i => invCard(i)).join('')
+    : `<div class="empty-state"><div class="empty-icon">📒</div><h3>Nothing here yet</h3><p>Tap <strong>Add New</strong> to record your first investment.</p></div>`;
+
+  // Update badge
+  const badgeCount = urgent.length + soon60.length;
+  const badge = document.getElementById('alert-badge');
+  badge.textContent = badgeCount;
+  badge.style.display = badgeCount ? 'flex' : 'none';
+  document.getElementById('notif-dot').classList.toggle('show', badgeCount > 0);
+}
+
+/* ════════════════════════════════════════
+   RENDER LIST
+═══════════════════════════════════════════ */
+function renderList() {
+  let list = [...data.investments];
+  if (currentFilter !== 'all') list = list.filter(i => i.type === currentFilter);
+
+  if (currentSort === 'maturity') list.sort((a, b) => {
+    if (!a.maturity) return 1; if (!b.maturity) return -1;
+    return new Date(a.maturity) - new Date(b.maturity);
+  });
+  else if (currentSort === 'amount') list.sort((a, b) => Number(b.principal) - Number(a.principal));
+  else list.sort((a, b) => b.addedAt - a.addedAt);
+
+  document.getElementById('list-body').innerHTML = list.length
+    ? list.map(i => invCard(i)).join('')
+    : `<div class="empty-state"><div class="empty-icon">🔍</div><h3>Nothing found</h3><p>No investments match this filter.</p></div>`;
+}
+function setFilter(el) {
+  document.querySelectorAll('.fchip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  currentFilter = el.dataset.f;
+  renderList();
+}
+
+/* ════════════════════════════════════════
+   INVESTMENT CARD HTML
+═══════════════════════════════════════════ */
+function invCard(inv) {
+  const dl = daysLeft(inv.maturity);
+  const cls = maturityClass(dl);
+  const lbl = maturityLabel(dl);
+  const typeLabel = (SCHEME_INFO[inv.type] || {}).label || inv.type;
+  const source = inv.sourceCustom || inv.source || '';
+  return `
+  <div class="inv-card" onclick="openDetail('${inv.id}')">
+    <div class="inv-card-top">
+      <div class="inv-card-left">
+        <div class="inv-name">${inv.name}</div>
+        <div class="inv-source">${source}${inv.accno ? ' · ' + inv.accno : ''}</div>
+      </div>
+      <div class="inv-card-right">
+        <div class="inv-amount">${fmt(inv.principal)}</div>
+        <div class="inv-rate">${inv.rate ? inv.rate + '% p.a.' : typeLabel}</div>
+      </div>
+    </div>
+    <div class="inv-card-bottom">
+      <div>
+        <div class="inv-mat-label">Matures on</div>
+        <div class="inv-mat-date">${fmtDate(inv.maturity)}</div>
+      </div>
+      <span class="mat-chip ${cls}">${lbl || typeLabel}</span>
+    </div>
+  </div>`;
+}
+
+/* ════════════════════════════════════════
+   RENDER ALERTS
+═══════════════════════════════════════════ */
+function renderAlerts() {
+  const invs = data.investments;
+  const groups = [
+    { label: '🚨 Maturing within 30 days', cls: 'red',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; }) },
+    { label: '⚠️ Maturing in 31–60 days',  cls: 'amber', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; }) },
+    { label: '🟠 Maturing in 61–90 days',  cls: 'gold',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 60 && d <= 90; }) },
+    { label: '✅ Already matured',          cls: 'green', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; }) }
+  ];
+
+  let html = '';
+  let anyAlert = false;
+  groups.forEach(g => {
+    if (!g.invs.length) return;
+    anyAlert = true;
+    html += `<div class="alert-banner ${g.cls}" style="flex-direction:column;gap:8px">
+      <div class="alert-title">${g.label}</div>
+      ${g.invs.sort((a,b)=>new Date(a.maturity)-new Date(b.maturity)).map(i => `
+        <div onclick="openDetail('${i.id}')" style="background:white;border-radius:var(--r-sm);padding:12px 14px;cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-size:14px;font-weight:600">${i.name}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px">${i.sourceCustom||i.source} · Matures ${fmtDate(i.maturity)}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:14px;font-weight:700;color:var(--accent)">${fmt(i.principal)}</div>
+              <div style="font-size:11px;color:var(--muted)">${maturityLabel(daysLeft(i.maturity))}</div>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  });
+
+  if (!anyAlert) {
+    html = `<div class="empty-state"><div class="empty-icon">🎉</div><h3>All clear!</h3><p>No investments maturing in the next 90 days. Good time to plan renewals.</p></div>`;
+  }
+  document.getElementById('alerts-body').innerHTML = html;
+}
+
+/* ════════════════════════════════════════
+   FORM — ADD / EDIT
+═══════════════════════════════════════════ */
+function newInvestment() {
+  editingId = null;
+  document.getElementById('form-heading').textContent = '📝 Add New Investment';
+  document.getElementById('save-btn').textContent = 'Save Investment';
+  clearForm();
+  showPage('add');
+}
+function clearForm() {
+  ['f-type','f-source','f-accno','f-principal','f-monthly','f-rate','f-start','f-y','f-m','f-maturity','f-matamt','f-notes','f-source-custom'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('f-reminder').value = '30';
+  document.getElementById('maturity-computed').style.display = 'none';
+  document.getElementById('maturity-amt-computed').style.display = 'none';
+  document.getElementById('days-left-hint').textContent = '';
+  document.getElementById('mat-amt-hint').textContent = '';
+  document.getElementById('type-info-box').style.display = 'none';
+  document.getElementById('scheme-hint').textContent = '';
+  document.getElementById('f-monthly-wrap').style.display = 'none';
+  document.getElementById('source-other').style.display = 'none';
+  document.getElementById('f-rate-hint').textContent = '';
+}
+
+function onTypeChange() {
+  const type = document.getElementById('f-type').value;
+  const info = SCHEME_INFO[type];
+
+  // Show info
+  if (info && info.info) {
+    document.getElementById('type-info-text').textContent = info.info;
+    document.getElementById('type-info-box').style.display = 'block';
+  } else {
+    document.getElementById('type-info-box').style.display = 'none';
+  }
+
+  // Show monthly instalment for RD
+  document.getElementById('f-monthly-wrap').style.display = type === 'RD' ? 'block' : 'none';
+
+  // Pre-fill tenure for fixed schemes
+  const preset = SCHEME_TENURE[type];
+  if (preset) {
+    document.getElementById('f-y').value = preset.y;
+    document.getElementById('f-m').value = preset.m;
+    document.getElementById('scheme-hint').textContent = `Standard tenure for ${info.label}: ${preset.y} year${preset.y!==1?'s':''} ${preset.m ? preset.m + ' months' : ''}`;
+  } else {
+    document.getElementById('f-y').value = '';
+    document.getElementById('f-m').value = '';
+    document.getElementById('scheme-hint').textContent = '';
+  }
+  calcMaturity();
+}
+
+function toggleOtherSource() {
+  const val = document.getElementById('f-source').value;
+  document.getElementById('source-other').style.display = val === 'Other' ? 'block' : 'none';
+}
+
+function calcMaturity() {
+  const start = document.getElementById('f-start').value;
+  const yrs = parseInt(document.getElementById('f-y').value) || 0;
+  const mos = parseInt(document.getElementById('f-m').value) || 0;
+  if (!start || (!yrs && !mos)) {
+    document.getElementById('maturity-computed').style.display = 'none';
+    updateDaysHint();
+    return;
+  }
+  const totalMonths = yrs * 12 + mos;
+  const matDate = addMonths(start, totalMonths);
+  document.getElementById('maturity-computed').textContent = fmtDate(matDate);
+  document.getElementById('maturity-computed').style.display = 'block';
+  document.getElementById('f-maturity').value = matDate;
+  updateDaysHint();
+  calcMatAmt();
+}
+
+function onMaturityManual() {
+  document.getElementById('maturity-computed').style.display = 'none';
+  updateDaysHint();
+  calcMatAmt();
+}
+
+function updateDaysHint() {
+  const mat = document.getElementById('f-maturity').value;
+  const hint = document.getElementById('days-left-hint');
+  if (!mat) { hint.textContent = ''; return; }
+  const dl = daysLeft(mat);
+  if (dl === null) return;
+  if (dl < 0) hint.textContent = `Already matured ${Math.abs(dl)} days ago`;
+  else if (dl === 0) hint.textContent = '🎯 Matures today!';
+  else hint.textContent = `${dl} days from today`;
+}
+
+function calcMatAmt() {
+  const type = document.getElementById('f-type').value;
+  const principal = parseFloat(document.getElementById('f-principal').value);
+  const rate = parseFloat(document.getElementById('f-rate').value);
+  const start = document.getElementById('f-start').value;
+  const maturity = document.getElementById('f-maturity').value;
+  const hintEl = document.getElementById('mat-amt-hint');
+  const compEl = document.getElementById('maturity-amt-computed');
+
+  if (!principal || !maturity || !start) { compEl.style.display = 'none'; hintEl.textContent = ''; return; }
+
+  const years = (new Date(maturity) - new Date(start)) / (365.25 * 86400000);
+
+  let amt = null;
+  if (type === 'KVP') {
+    amt = principal * 2;
+    hintEl.textContent = 'KVP doubles at maturity';
+  } else if (rate && years > 0) {
+    // Compound interest (annual compounding)
+    amt = principal * Math.pow(1 + rate / 100, years);
+    hintEl.textContent = `Est. via compound interest over ${years.toFixed(1)} years`;
+  }
+
+  if (amt) {
+    compEl.textContent = fmt(Math.round(amt));
+    compEl.style.display = 'block';
+    if (!document.getElementById('f-matamt').value) {
+      document.getElementById('f-matamt').value = Math.round(amt);
+    }
+  } else {
+    compEl.style.display = 'none';
+    hintEl.textContent = 'Enter rate and dates to auto-calculate';
+  }
+}
+
+function saveInvestment() {
+  const type    = document.getElementById('f-type').value;
+  const source  = document.getElementById('f-source').value;
+  const sourceC = document.getElementById('f-source-custom').value.trim();
+  const principal = document.getElementById('f-principal').value;
+  const maturity  = document.getElementById('f-maturity').value;
+  const start     = document.getElementById('f-start').value;
+
+  if (!type)      { toast('Please select investment type'); return; }
+  if (!source)    { toast('Please select institution'); return; }
+  if (!principal) { toast('Please enter principal amount'); return; }
+  if (!start)     { toast('Please enter start date'); return; }
+  if (!maturity)  { toast('Please enter maturity date'); return; }
+
+  const sourceLabel = source === 'Other' ? sourceC : source;
+  const typeLabel = (SCHEME_INFO[type]||{}).label || type;
+  const autoName = `${typeLabel} — ${sourceLabel}`;
+
+  const inv = {
+    id: editingId || uid(),
+    name: autoName,
+    type, source, sourceCustom: sourceC,
+    accno:    document.getElementById('f-accno').value.trim(),
+    principal: parseFloat(principal),
+    monthly:   parseFloat(document.getElementById('f-monthly').value) || null,
+    rate:      parseFloat(document.getElementById('f-rate').value) || null,
+    start, maturity,
+    matamt:    parseFloat(document.getElementById('f-matamt').value) || null,
+    reminder:  parseInt(document.getElementById('f-reminder').value),
+    notes:     document.getElementById('f-notes').value.trim(),
+    addedAt:   editingId ? (data.investments.find(i=>i.id===editingId)||{}).addedAt : Date.now()
+  };
+
+  if (editingId) {
+    const idx = data.investments.findIndex(i => i.id === editingId);
+    data.investments[idx] = inv;
+    toast('Investment updated ✓');
+  } else {
+    data.investments.push(inv);
+    toast('Investment saved ✓');
+  }
+  save();
+  scheduleNotifications();
+  editingId = null;
+  clearForm();
+  showPage('home');
+}
+
+function cancelForm() {
+  editingId = null;
+  clearForm();
+  showPage('home');
+}
+
+/* ════════════════════════════════════════
+   DETAIL SHEET
+═══════════════════════════════════════════ */
+function openDetail(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  const dl = daysLeft(inv.maturity);
+  const cls = maturityClass(dl);
+  const lbl = maturityLabel(dl);
+  const source = inv.sourceCustom || inv.source || '';
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">${inv.name}</div>
+        <div class="detail-source">${source}</div>
+      </div>
+      <span class="mat-chip ${cls}">${lbl || 'Active'}</span>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-row"><div class="d-lbl">Principal</div><div class="d-val" style="color:var(--accent)">${fmt(inv.principal)}</div></div>
+      <div class="detail-row"><div class="d-lbl">Type</div><div class="d-val">${(SCHEME_INFO[inv.type]||{}).label||inv.type}</div></div>
+      <div class="detail-row"><div class="d-lbl">Interest rate</div><div class="d-val">${inv.rate ? inv.rate + '% p.a.' : '—'}</div></div>
+      <div class="detail-row"><div class="d-lbl">Maturity amount</div><div class="d-val" style="color:var(--accent)">${fmt(inv.matamt)}</div></div>
+      <div class="detail-row"><div class="d-lbl">Start date</div><div class="d-val">${fmtDate(inv.start)}</div></div>
+      <div class="detail-row"><div class="d-lbl">Maturity date</div><div class="d-val">${fmtDate(inv.maturity)}</div></div>
+      ${inv.accno ? `<div class="detail-row full"><div class="d-lbl">Account / Certificate no.</div><div class="d-val">${inv.accno}</div></div>` : ''}
+      ${inv.notes ? `<div class="detail-row full"><div class="d-lbl">Notes</div><div class="d-val" style="font-size:14px;font-weight:400">${inv.notes}</div></div>` : ''}
+      ${inv.monthly ? `<div class="detail-row full"><div class="d-lbl">Monthly instalment</div><div class="d-val">${fmt(inv.monthly)}</div></div>` : ''}
+    </div>
+    <div class="detail-actions">
+      <button class="btn btn-outline" onclick="editInvestment('${inv.id}')">✏️ Edit</button>
+      <button class="btn btn-danger" onclick="deleteInvestment('${inv.id}')">🗑️ Delete</button>
+    </div>
+    <div class="detail-share">
+      <button class="btn btn-whatsapp" onclick="shareOneWhatsApp('${inv.id}')">📲 Share on WhatsApp</button>
+    </div>
+  `;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function closeDetail(e) {
+  if (e.target === document.getElementById('detail-overlay')) {
+    document.getElementById('detail-overlay').classList.remove('open');
+  }
+}
+
+function editInvestment(id) {
+  document.getElementById('detail-overlay').classList.remove('open');
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  editingId = id;
+  document.getElementById('form-heading').textContent = '✏️ Edit Investment';
+  document.getElementById('save-btn').textContent = 'Update Investment';
+
+  setTimeout(() => {
+    document.getElementById('f-type').value = inv.type;
+    onTypeChange();
+    document.getElementById('f-source').value = inv.source;
+    toggleOtherSource();
+    if (inv.sourceCustom) document.getElementById('f-source-custom').value = inv.sourceCustom;
+    document.getElementById('f-accno').value = inv.accno || '';
+    document.getElementById('f-principal').value = inv.principal;
+    if (inv.monthly) document.getElementById('f-monthly').value = inv.monthly;
+    if (inv.rate) document.getElementById('f-rate').value = inv.rate;
+    document.getElementById('f-start').value = inv.start || '';
+    document.getElementById('f-maturity').value = inv.maturity || '';
+    if (inv.matamt) document.getElementById('f-matamt').value = inv.matamt;
+    document.getElementById('f-reminder').value = inv.reminder || 30;
+    document.getElementById('f-notes').value = inv.notes || '';
+    updateDaysHint();
+  }, 50);
+  showPage('add');
+}
+
+function deleteInvestment(id) {
+  if (!confirm('Delete this investment? This cannot be undone.')) return;
+  data.investments = data.investments.filter(i => i.id !== id);
+  save();
+  document.getElementById('detail-overlay').classList.remove('open');
+  toast('Investment deleted');
+  renderHome();
+  renderList();
+}
+
+/* ════════════════════════════════════════
+   NOTIFICATIONS
+═══════════════════════════════════════════ */
+async function requestNotifPermission() {
+  if (!('Notification' in window)) { toast('Notifications not supported on this browser'); return; }
+  const result = await Notification.requestPermission();
+  if (result === 'granted') {
+    data.settings.notifEnabled = true; save();
+    scheduleNotifications();
+    toast('Notifications enabled! ✓');
+    dismissNotifPrompt();
+    updateNotifUI();
+  } else {
+    toast('Notification permission denied');
+  }
+}
+
+function dismissNotifPrompt() {
+  document.getElementById('notif-prompt').classList.remove('show');
+  sessionStorage.setItem('notif_dismissed', '1');
+}
+
+function scheduleNotifications() {
+  if (!('serviceWorker' in navigator) || !data.settings.notifEnabled) return;
+  if (Notification.permission !== 'granted') return;
+
+  navigator.serviceWorker.ready.then(reg => {
+    data.investments.forEach(inv => {
+      if (!inv.maturity) return;
+      const dl = daysLeft(inv.maturity);
+      const reminderAt = inv.reminder || 30;
+      if (dl !== null && dl >= 0 && dl <= reminderAt) {
+        const title = dl === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${dl} days`;
+        const body  = `${fmt(inv.principal)} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+        reg.active && reg.active.postMessage({ type: 'SCHEDULE_NOTIFICATION', title, body, delay: 2000 });
+      }
+    });
+  }).catch(() => {});
+}
+
+function toggleNotifications() {
+  if (data.settings.notifEnabled) {
+    data.settings.notifEnabled = false; save();
+    toast('Notifications disabled');
+    updateNotifUI();
+  } else {
+    requestNotifPermission();
+  }
+}
+
+function updateNotifUI() {
+  const on = data.settings.notifEnabled && Notification.permission === 'granted';
+  document.getElementById('notif-status-text').textContent = on ? 'Enabled — reminders active' : 'Tap to enable maturity reminders';
+  document.getElementById('notif-toggle-btn').textContent = on ? 'Disable' : 'Enable';
+}
+
+/* ════════════════════════════════════════
+   SHARE
+═══════════════════════════════════════════ */
+function buildSummaryText() {
+  const invs = data.investments;
+  const urgent = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; })
+                      .sort((a,b) => new Date(a.maturity) - new Date(b.maturity));
+  let msg = `*📒 Nivesh Diary — Investment Summary*\n`;
+  msg += `Date: ${new Date().toLocaleDateString('en-IN')}\n\n`;
+  if (urgent.length) {
+    msg += `*⚠️ Maturing in next 90 days:*\n`;
+    urgent.forEach(i => {
+      msg += `• ${i.name}\n  ${fmtDate(i.maturity)} · ${fmt(i.principal)}${i.matamt ? ' → ' + fmt(i.matamt) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
+    });
+    msg += '\n';
+  }
+  const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
+  msg += `*Total invested: ${fmt(total)}* across ${invs.length} investments`;
+  return msg;
+}
+
+function shareWhatsApp() {
+  const msg = buildSummaryText();
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+function shareOneWhatsApp(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  const dl = daysLeft(inv.maturity);
+  const msg = `📒 *Investment Details*\n\n*${inv.name}*\nInstitution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+function shareEmail() {
+  const invs = data.investments;
+  const urgent = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; })
+                      .sort((a,b) => new Date(a.maturity) - new Date(b.maturity));
+  const subject = `Investment Maturity Alert — ${new Date().toLocaleDateString('en-IN')}`;
+  let body = `Dear,\n\nHere is your investment summary from Nivesh Diary.\n\n`;
+  if (urgent.length) {
+    body += `UPCOMING MATURITIES (next 90 days):\n${'─'.repeat(40)}\n`;
+    urgent.forEach(i => {
+      body += `• ${i.name}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${fmt(i.principal)}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt) : ''}\n\n`;
+    });
+  }
+  const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
+  body += `\nTOTAL INVESTED: ${fmt(total)} across ${invs.length} investments\n\n— Sent from Nivesh Diary`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+/* ════════════════════════════════════════
+   BACKUP / IMPORT / EXPORT
+═══════════════════════════════════════════ */
+function exportData() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `nivesh-diary-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded ✓');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!imported.investments) throw new Error('Invalid file');
+      if (!confirm(`Import ${imported.investments.length} investments? This will merge with existing data.`)) return;
+      const existingIds = new Set(data.investments.map(i => i.id));
+      imported.investments.forEach(inv => {
+        if (!existingIds.has(inv.id)) data.investments.push(inv);
+      });
+      save();
+      toast(`Imported ${imported.investments.length} records ✓`);
+      renderHome();
+    } catch(err) {
+      toast('Invalid backup file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function confirmDeleteAll() {
+  if (!confirm('DELETE ALL DATA? This permanently removes all investments and cannot be undone.')) return;
+  if (!confirm('Are you absolutely sure? All data will be lost.')) return;
+  data.investments = [];
+  save();
+  toast('All data deleted');
+  closeSheet(null, 'backup-overlay', true);
+  renderHome();
+}
+
+function openSheet(id) {
+  document.getElementById(id.includes('backup') ? 'backup-overlay' : id).classList.add('open');
+  updateNotifUI();
+}
+function closeSheet(e, id, force) {
+  if (force || !e || e.target === document.getElementById(id)) {
+    document.getElementById(id).classList.remove('open');
+  }
+}
+document.getElementById('backup-overlay').addEventListener('click', e => closeSheet(e, 'backup-overlay'));
+
+/* ════════════════════════════════════════
+   PWA INSTALL
+═══════════════════════════════════════════ */
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('install-banner').style.display = 'flex';
+});
+function installPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(r => {
+    if (r.outcome === 'accepted') {
+      document.getElementById('install-banner').style.display = 'none';
+      toast('App installed! 🎉 Find it on your home screen.');
+    }
+    deferredInstallPrompt = null;
+  });
+}
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').style.display = 'none';
+});
+
+/* ════════════════════════════════════════
+   SERVICE WORKER
+═══════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(() => {
+    scheduleNotifications();
+  }).catch(() => {});
+}
+
+/* ════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+/* ════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+function init() {
+  load();
+
+  // Show notif prompt if not dismissed and not yet granted
+  if (!sessionStorage.getItem('notif_dismissed') &&
+      'Notification' in window &&
+      Notification.permission === 'default') {
+    document.getElementById('notif-prompt').classList.add('show');
+  }
+
+  renderHome();
+
+  // Seed with sample data if empty (helps parents understand the app)
+  if (data.investments.length === 0) {
+    const today = new Date();
+    const fmt2 = d => d.toISOString().split('T')[0];
+    const addMonths2 = (d, m) => { const x = new Date(d); x.setMonth(x.getMonth()+m); return x; };
+    const samples = [
+      { type:'FD',   source:'State Bank of India (SBI)', principal:200000, rate:7.0, start: fmt2(new Date(today.getFullYear()-1, today.getMonth(), today.getDate())), maturity: fmt2(addMonths2(today, 11)), matamt:214000, notes:'Linked to SB account. Auto-renewal OFF.' },
+      { type:'NSC',  source:'India Post / Post Office',  principal:50000,  rate:7.7, start: fmt2(new Date(today.getFullYear()-3, 4, 15)), maturity: fmt2(new Date(today.getFullYear()+2, 4, 15)), matamt:71893 },
+      { type:'KVP',  source:'India Post / Post Office',  principal:100000, rate:null, start: fmt2(new Date(today.getFullYear()-2, 0, 10)), maturity: fmt2(new Date(today.getFullYear()+7, 7, 10)), matamt:200000, notes:'Certificate no. KVP-2022-10012' },
+      { type:'SCSS', source:'State Bank of India (SBI)', principal:300000, rate:8.2, start: fmt2(new Date(today.getFullYear()-1, 6, 1)), maturity: fmt2(new Date(today.getFullYear()+4, 6, 1)), matamt:435960, notes:'Quarterly interest payout to savings account.' },
+    ];
+    samples.forEach(s => {
+      data.investments.push({ id: uid(), name: `${(SCHEME_INFO[s.type]||{}).label||s.type} — ${s.source}`, addedAt: Date.now()-Math.random()*1e9, reminder: 30, accno:'', monthly:null, sourceCustom:'', ...s });
+    });
+    save();
+    renderHome();
+    toast('Loaded with sample data — tap any card to explore 👆');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
