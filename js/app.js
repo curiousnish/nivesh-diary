@@ -345,6 +345,16 @@ function calcMaturity() {
   const start = document.getElementById('f-start').value;
   const yrs = parseInt(document.getElementById('f-y').value) || 0;
   const mos = parseInt(document.getElementById('f-m').value) || 0;
+
+  const type = document.getElementById('f-type').value;
+  if (type === 'RD') {
+    const totalMonths = yrs * 12 + mos;
+    const monthlyAmt = parseFloat(document.getElementById('f-monthly').value);
+    if (totalMonths > 0 && monthlyAmt > 0) {
+      document.getElementById('f-principal').value = (totalMonths * monthlyAmt).toFixed(0);
+    }
+  }
+
   if (!start || (!yrs && !mos)) {
     document.getElementById('maturity-computed').style.display = 'none';
     updateDaysHint();
@@ -393,10 +403,36 @@ function calcMatAmt() {
   if (type === 'KVP') {
     amt = principal * 2;
     hintEl.textContent = 'KVP doubles at maturity';
+  } else if (type === 'RD' && rate && years > 0) {
+    const months = Math.round(years * 12);
+    const P = parseFloat(document.getElementById('f-monthly').value) || (principal / months);
+    let total = 0;
+    const quarterRate = rate / 400; // typical quarterly compounding for RD in India
+    for (let i = 1; i <= months; i++) {
+      const remainingMonths = months - i + 1;
+      total += P * Math.pow(1 + quarterRate, remainingMonths / 3);
+    }
+    amt = total;
+    hintEl.textContent = `Est. RD maturity for ${months} months`;
   } else if (rate && years > 0) {
-    // Compound interest (annual compounding)
-    amt = principal * Math.pow(1 + rate / 100, years);
-    hintEl.textContent = `Est. via compound interest over ${years.toFixed(1)} years`;
+    if (type === 'FD') {
+      // Cumulative Bank FD: typically compounded quarterly
+      amt = principal * Math.pow(1 + rate / 400, years * 4);
+      hintEl.textContent = `Est. via quarterly compounding over ${years.toFixed(1)} years`;
+    } else if (type === 'TD') {
+      // Post Office TD: calculated quarterly, paid annually
+      const annualInterest = principal * (Math.pow(1 + rate / 400, 4) - 1);
+      amt = principal + (annualInterest * years);
+      hintEl.textContent = `Total return (Calculated quarterly, paid annually)`;
+    } else if (type === 'MIS' || type === 'SCSS' || type === 'Bond') {
+      // Payout schemes: total return = principal + simple interest
+      amt = principal + (principal * (rate / 100) * years);
+      hintEl.textContent = `Total value (Principal + Simple Interest payout)`;
+    } else {
+      // NSC, PPF, Other: compounded annually
+      amt = principal * Math.pow(1 + rate / 100, years);
+      hintEl.textContent = `Est. via annual compounding over ${years.toFixed(1)} years`;
+    }
   }
 
   if (amt) {
