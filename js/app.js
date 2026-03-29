@@ -293,7 +293,10 @@ function newInvestment() {
 function clearForm() {
   ['f-type','f-source','f-accno','f-principal','f-monthly','f-rate','f-start','f-y','f-m','f-maturity','f-matamt','f-notes','f-source-custom'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.value = '';
+    if (el) {
+      el.value = '';
+      delete el.dataset.auto;
+    }
   });
   document.getElementById('f-reminder').value = '30';
   document.getElementById('maturity-computed').style.display = 'none';
@@ -346,22 +349,35 @@ function calcMaturity() {
   const yrs = parseInt(document.getElementById('f-y').value) || 0;
   const mos = parseInt(document.getElementById('f-m').value) || 0;
 
+  let totalMonths = yrs * 12 + mos;
+  const maturityInput = document.getElementById('f-maturity').value;
+  
+  // If tenure is not provided but start and maturity are, use them to find total months
+  if (!totalMonths && start && maturityInput) {
+    const diffYears = (new Date(maturityInput) - new Date(start)) / (365.25 * 86400000);
+    if (diffYears > 0) totalMonths = Math.round(diffYears * 12);
+  }
+
   const type = document.getElementById('f-type').value;
   if (type === 'RD') {
-    const totalMonths = yrs * 12 + mos;
     const monthlyAmt = parseFloat(document.getElementById('f-monthly').value);
     if (totalMonths > 0 && monthlyAmt > 0) {
-      document.getElementById('f-principal').value = (totalMonths * monthlyAmt).toFixed(0);
+      const computedP = (totalMonths * monthlyAmt).toFixed(0);
+      const prinEl = document.getElementById('f-principal');
+      if (!prinEl.value || prinEl.dataset.auto == prinEl.value) {
+        prinEl.value = computedP;
+        prinEl.dataset.auto = computedP;
+      }
     }
   }
 
   if (!start || (!yrs && !mos)) {
     document.getElementById('maturity-computed').style.display = 'none';
     updateDaysHint();
+    calcMatAmt();
     return;
   }
-  const totalMonths = yrs * 12 + mos;
-  const matDate = addMonths(start, totalMonths);
+  const matDate = addMonths(start, yrs * 12 + mos);
   document.getElementById('maturity-computed').textContent = fmtDate(matDate);
   document.getElementById('maturity-computed').style.display = 'block';
   document.getElementById('f-maturity').value = matDate;
@@ -371,6 +387,26 @@ function calcMaturity() {
 
 function onMaturityManual() {
   document.getElementById('maturity-computed').style.display = 'none';
+  
+  const type = document.getElementById('f-type').value;
+  const start = document.getElementById('f-start').value;
+  const maturity = document.getElementById('f-maturity').value;
+  
+  // Handle RD auto-principal generation if manual maturity date changes
+  if (type === 'RD' && start && maturity) {
+    const diffYears = (new Date(maturity) - new Date(start)) / (365.25 * 86400000);
+    const monthlyAmt = parseFloat(document.getElementById('f-monthly').value);
+    if (diffYears > 0 && monthlyAmt > 0) {
+      const totalMonths = Math.round(diffYears * 12);
+      const computedP = (totalMonths * monthlyAmt).toFixed(0);
+      const prinEl = document.getElementById('f-principal');
+      if (!prinEl.value || prinEl.dataset.auto == prinEl.value) {
+        prinEl.value = computedP;
+        prinEl.dataset.auto = computedP;
+      }
+    }
+  }
+
   updateDaysHint();
   calcMatAmt();
 }
@@ -438,8 +474,12 @@ function calcMatAmt() {
   if (amt) {
     compEl.textContent = fmt(Math.round(amt));
     compEl.style.display = 'block';
-    if (!document.getElementById('f-matamt').value) {
-      document.getElementById('f-matamt').value = Math.round(amt);
+    
+    const matAmtEl = document.getElementById('f-matamt');
+    const computedMat = Math.round(amt).toString();
+    if (!matAmtEl.value || matAmtEl.dataset.auto == matAmtEl.value) {
+      matAmtEl.value = computedMat;
+      matAmtEl.dataset.auto = computedMat;
     }
   } else {
     compEl.style.display = 'none';
@@ -564,11 +604,15 @@ function editInvestment(id) {
     if (inv.sourceCustom) document.getElementById('f-source-custom').value = inv.sourceCustom;
     document.getElementById('f-accno').value = inv.accno || '';
     document.getElementById('f-principal').value = inv.principal;
+    document.getElementById('f-principal').dataset.auto = inv.principal;
     if (inv.monthly) document.getElementById('f-monthly').value = inv.monthly;
     if (inv.rate) document.getElementById('f-rate').value = inv.rate;
     document.getElementById('f-start').value = inv.start || '';
     document.getElementById('f-maturity').value = inv.maturity || '';
-    if (inv.matamt) document.getElementById('f-matamt').value = inv.matamt;
+    if (inv.matamt) {
+      document.getElementById('f-matamt').value = inv.matamt;
+      document.getElementById('f-matamt').dataset.auto = inv.matamt;
+    }
     document.getElementById('f-reminder').value = inv.reminder || 30;
     document.getElementById('f-notes').value = inv.notes || '';
     updateDaysHint();
