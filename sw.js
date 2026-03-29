@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nivesh-diary-v1';
+const CACHE_NAME = 'nivesh-diary-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,11 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim());
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.map(k => (k !== CACHE_NAME) ? caches.delete(k) : null)
+    )).then(() => clients.claim())
+  );
 });
 
 self.addEventListener('fetch', e => {
