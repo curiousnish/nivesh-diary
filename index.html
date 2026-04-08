@@ -327,6 +327,21 @@
   </div>
 </div>
 
+<!-- PASSWORD MODAL -->
+<div class="overlay" id="password-overlay">
+  <div class="sheet" style="min-height:auto;padding-bottom:24px;">
+    <h2 id="pwd-modal-title" style="font-family:'Lora',serif;font-size:18px;margin-bottom:6px">Enter Password</h2>
+    <p id="pwd-modal-desc" style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6"></p>
+    <div class="field">
+      <input type="password" id="pwd-input" placeholder="Password">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closePasswordModal()">Cancel</button>
+      <button class="btn btn-primary" id="pwd-confirm-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 

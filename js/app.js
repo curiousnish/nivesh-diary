@@ -740,8 +740,113 @@ function shareEmail() {
 /* ════════════════════════════════════════
    BACKUP / IMPORT / EXPORT
 ═══════════════════════════════════════════ */
-function exportData() {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+let passwordPromptResolver = null;
+
+function promptPassword(title, desc, placeholder) {
+  return new Promise(resolve => {
+    document.getElementById('pwd-modal-title').textContent = title;
+    document.getElementById('pwd-modal-desc').textContent = desc;
+    document.getElementById('pwd-input').placeholder = placeholder || 'Password';
+    document.getElementById('pwd-input').value = '';
+    
+    passwordPromptResolver = resolve;
+    document.getElementById('password-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('pwd-input').focus(), 300);
+  });
+}
+
+function resolvePasswordModal(value) {
+  document.getElementById('password-overlay').classList.remove('open');
+  if (passwordPromptResolver) {
+    passwordPromptResolver(value);
+    passwordPromptResolver = null;
+  }
+}
+
+function closePasswordModal() {
+  resolvePasswordModal(null);
+}
+
+document.getElementById('pwd-confirm-btn').addEventListener('click', () => {
+  resolvePasswordModal(document.getElementById('pwd-input').value);
+});
+document.getElementById('pwd-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') resolvePasswordModal(document.getElementById('pwd-input').value);
+});
+
+async function deriveKey(password, saltBuffer) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
+  );
+  return window.crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: saltBuffer, iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false, ["encrypt", "decrypt"]
+  );
+}
+
+function bufferToBase64(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+
+function base64ToBuffer(b64) {
+  const binary_string = window.atob(b64);
+  const len = binary_string.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binary_string.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function encryptBackup(plainText, password) {
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(password, salt);
+  
+  const enc = new TextEncoder();
+  const encryptedContent = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv }, key, enc.encode(plainText)
+  );
+
+  return JSON.stringify({
+    encrypted: true,
+    salt: bufferToBase64(salt),
+    iv: bufferToBase64(iv),
+    ciphertext: bufferToBase64(encryptedContent)
+  }, null, 2);
+}
+
+async function decryptBackup(encryptedObj, password) {
+  const salt = base64ToBuffer(encryptedObj.salt);
+  const iv = base64ToBuffer(encryptedObj.iv);
+  const ciphertext = base64ToBuffer(encryptedObj.ciphertext);
+  const key = await deriveKey(password, salt);
+
+  const decryptedContent = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv }, key, ciphertext
+  );
+
+  const dec = new TextDecoder();
+  return dec.decode(decryptedContent);
+}
+
+async function exportData() {
+  closeSheet(null, 'backup-overlay', true);
+  const pwd = await promptPassword("Encrypt Backup", "Enter an optional password to encrypt your backup (leave empty for no encryption):", "Optional Password");
+  if (pwd === null) return; // User clicked Cancel
+  
+  let outData = JSON.stringify(data, null, 2);
+  if (pwd.trim().length > 0) {
+    try {
+      outData = await encryptBackup(outData, pwd);
+    } catch(e) {
+      toast('Encryption failed: ' + e.message);
+      return;
+    }
+  }
+
+  const blob = new Blob([outData], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -755,11 +860,37 @@ function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
-      const imported = JSON.parse(e.target.result);
-      if (!imported.investments) throw new Error('Invalid file');
-      if (!confirm(`Import ${imported.investments.length} investments? This will merge with existing data.`)) return;
+      // Hide backup overlay so prompt is visible cleanly
+      closeSheet(null, 'backup-overlay', true);
+
+      let imported = JSON.parse(e.target.result);
+      
+      // Decryption Logic
+      if (imported.encrypted) {
+        const pwd = await promptPassword("Decrypt Backup", "This backup is encrypted. Enter password to decrypt:", "Password");
+        if (pwd === null) {
+            toast("Import cancelled");
+            event.target.value = '';
+            return;
+        }
+        try {
+          const dec = await decryptBackup(imported, pwd);
+          imported = JSON.parse(dec);
+        } catch(err) {
+          toast("Incorrect password or corrupt file");
+          event.target.value = '';
+          return;
+        }
+      }
+
+      if (!imported.investments) throw new Error('Invalid file structure');
+      if (!confirm(`Import ${imported.investments.length} investments? This will merge with existing data.`)) {
+         event.target.value = '';
+         return;
+      }
+      
       const existingIds = new Set(data.investments.map(i => i.id));
       imported.investments.forEach(inv => {
         if (!existingIds.has(inv.id)) data.investments.push(inv);
@@ -767,12 +898,14 @@ function importData(event) {
       save();
       toast(`Imported ${imported.investments.length} records ✓`);
       renderHome();
+      renderList();
     } catch(err) {
+      console.error(err);
       toast('Invalid backup file');
     }
+    event.target.value = '';
   };
   reader.readAsText(file);
-  event.target.value = '';
 }
 
 function confirmDeleteAll() {
