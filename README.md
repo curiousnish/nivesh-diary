@@ -10,6 +10,7 @@
 -   **⏰ Maturity Alerts:** Never miss a maturity date! Get local notifications and dashboard reminders for upcoming maturities (Urgent, Soon, and Upcoming).
 -   **🔒 Privacy First:** All data stays on your device in `localStorage`. No cloud syncing, no trackers, and no backend.
 -   **🔐 Encrypted Backups:** Export and import your data as encrypted JSON files using the Web Crypto API (AES-GCM).
+-   **👁️ Privacy Toggle:** Instantly hide or show investment amounts on the dashboard and lists for better privacy in public spaces.
 -   **🖥️ Offline Decryption:** A standalone Python script allows you to decrypt your data backups even if you don't have access to the web app.
 -   **📱 PWA Ready:** Install it on your phone or desktop for an app-like experience. Works completely offline once installed.
 -   **📊 Financial Summary:** View total invested amounts, upcoming returns, and recent investment history at a glance.
