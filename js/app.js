@@ -2,7 +2,7 @@
    DATA & STORAGE
 ═══════════════════════════════════════════ */
 const STORE_KEY = 'nivesh_diary_v2';
-let data = { investments: [], settings: { reminderDays: 30, notifEnabled: false } };
+let data = { investments: [], settings: { reminderDays: 30, notifEnabled: false, hideAmounts: false } };
 let editingId = null;
 let currentFilter = 'all';
 let currentSort = 'maturity';
@@ -13,7 +13,8 @@ function load() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) data = JSON.parse(raw);
     if (!data.investments) data.investments = [];
-    if (!data.settings) data.settings = { reminderDays: 30, notifEnabled: false };
+    if (!data.settings) data.settings = { reminderDays: 30, notifEnabled: false, hideAmounts: false };
+    if (data.settings.hideAmounts === undefined) data.settings.hideAmounts = false;
   } catch(e) {}
 }
 function save() {
@@ -57,9 +58,38 @@ function showPage(name) {
 /* ════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════ */
-function fmt(n) {
+function fmt(n, forceVisible = false) {
   if (!n && n !== 0) return '—';
+  if (data.settings.hideAmounts && !forceVisible) return '₹ ••••';
   return '₹' + Number(n).toLocaleString('en-IN');
+}
+
+function toggleHideAmounts() {
+  data.settings.hideAmounts = !data.settings.hideAmounts;
+  save();
+  updateHideUI();
+  // Re-render current page
+  if (document.getElementById('page-home').classList.contains('active')) renderHome();
+  if (document.getElementById('page-list').classList.contains('active')) renderList();
+  if (document.getElementById('page-alerts').classList.contains('active')) renderAlerts();
+  
+  // If detail sheet is open, we might need to refresh it too, but it uses IDs so it's tricky.
+  // Easiest is to close it or just let the user re-open it. 
+  // Actually, let's see if we can find if detail-overlay is open.
+  if (document.getElementById('detail-overlay').classList.contains('open')) {
+    // Extract ID from detail body if possible, or just close it.
+    // Since detail body is generated, let's just re-open the last one if we had its ID.
+    // For now, let's just leave it or close it. Closing is safer.
+    document.getElementById('detail-overlay').classList.remove('open');
+  }
+}
+
+function updateHideUI() {
+  const btn = document.getElementById('hide-toggle-btn');
+  if (btn) {
+    btn.textContent = data.settings.hideAmounts ? '🔒' : '👁️';
+    btn.title = data.settings.hideAmounts ? 'Show Amounts' : 'Hide Amounts';
+  }
 }
 function fmtDate(d) {
   if (!d) return '—';
@@ -472,7 +502,7 @@ function calcMatAmt() {
   }
 
   if (amt) {
-    compEl.textContent = fmt(Math.round(amt));
+    compEl.textContent = fmt(Math.round(amt), true);
     compEl.style.display = 'block';
     
     const matAmtEl = document.getElementById('f-matamt');
@@ -698,12 +728,12 @@ function buildSummaryText() {
   if (urgent.length) {
     msg += `*⚠️ Maturing in next 90 days:*\n`;
     urgent.forEach(i => {
-      msg += `• ${i.name}\n  ${fmtDate(i.maturity)} · ${fmt(i.principal)}${i.matamt ? ' → ' + fmt(i.matamt) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
+      msg += `• ${i.name}\n  ${fmtDate(i.maturity)} · ${fmt(i.principal, true)}${i.matamt ? ' → ' + fmt(i.matamt, true) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
     });
     msg += '\n';
   }
   const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
-  msg += `*Total invested: ${fmt(total)}* across ${invs.length} investments`;
+  msg += `*Total invested: ${fmt(total, true)}* across ${invs.length} investments`;
   return msg;
 }
 
@@ -716,7 +746,7 @@ function shareOneWhatsApp(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
-  const msg = `📒 *Investment Details*\n\n*${inv.name}*\nInstitution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+  const msg = `📒 *Investment Details*\n\n*${inv.name}*\nInstitution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal, true)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -729,11 +759,11 @@ function shareEmail() {
   if (urgent.length) {
     body += `UPCOMING MATURITIES (next 90 days):\n${'─'.repeat(40)}\n`;
     urgent.forEach(i => {
-      body += `• ${i.name}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${fmt(i.principal)}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt) : ''}\n\n`;
+      body += `• ${i.name}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${fmt(i.principal, true)}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt, true) : ''}\n\n`;
     });
   }
   const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
-  body += `\nTOTAL INVESTED: ${fmt(total)} across ${invs.length} investments\n\n— Sent from Nivesh Diary`;
+  body += `\nTOTAL INVESTED: ${fmt(total, true)} across ${invs.length} investments\n\n— Sent from Nivesh Diary`;
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
@@ -978,6 +1008,7 @@ function toast(msg) {
 ═══════════════════════════════════════════ */
 function init() {
   load();
+  updateHideUI();
 
   // Show notif prompt if not dismissed and not yet granted
   if (!sessionStorage.getItem('notif_dismissed') &&
