@@ -247,12 +247,13 @@ function invCard(inv) {
   const lbl = maturityLabel(dl);
   const typeLabel = (SCHEME_INFO[inv.type] || {}).label || inv.type;
   const source = inv.sourceCustom || inv.source || '';
+  const investorInfo = inv.investor ? `👤 ${inv.investor} · ` : '';
   return `
   <div class="inv-card" onclick="openDetail('${inv.id}')">
     <div class="inv-card-top">
       <div class="inv-card-left">
         <div class="inv-name">${inv.name}</div>
-        <div class="inv-source">${source}${inv.accno ? ' · ' + inv.accno : ''}</div>
+        <div class="inv-source">${investorInfo}${source}${inv.accno ? ' · ' + inv.accno : ''}</div>
       </div>
       <div class="inv-card-right">
         <div class="inv-amount">${fmt(inv.principal)}</div>
@@ -321,7 +322,7 @@ function newInvestment() {
   showPage('add');
 }
 function clearForm() {
-  ['f-type','f-source','f-accno','f-principal','f-monthly','f-rate','f-start','f-y','f-m','f-maturity','f-matamt','f-notes','f-source-custom'].forEach(id => {
+  ['f-type','f-source','f-accno','f-investor','f-principal','f-monthly','f-rate','f-start','f-y','f-m','f-maturity','f-matamt','f-notes','f-source-custom'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.value = '';
@@ -540,6 +541,7 @@ function saveInvestment() {
     name: autoName,
     type, source, sourceCustom: sourceC,
     accno:    document.getElementById('f-accno').value.trim(),
+    investor: document.getElementById('f-investor').value.trim(),
     principal: parseFloat(principal),
     monthly:   parseFloat(document.getElementById('f-monthly').value) || null,
     rate:      parseFloat(document.getElementById('f-rate').value) || null,
@@ -597,6 +599,7 @@ function openDetail(id) {
       <div class="detail-row"><div class="d-lbl">Maturity amount</div><div class="d-val" style="color:var(--accent)">${fmt(inv.matamt)}</div></div>
       <div class="detail-row"><div class="d-lbl">Start date</div><div class="d-val">${fmtDate(inv.start)}</div></div>
       <div class="detail-row"><div class="d-lbl">Maturity date</div><div class="d-val">${fmtDate(inv.maturity)}</div></div>
+      ${inv.investor ? `<div class="detail-row full"><div class="d-lbl">Investor</div><div class="d-val">${inv.investor}</div></div>` : ''}
       ${inv.accno ? `<div class="detail-row full"><div class="d-lbl">Account / Certificate no.</div><div class="d-val">${inv.accno}</div></div>` : ''}
       ${inv.notes ? `<div class="detail-row full"><div class="d-lbl">Notes</div><div class="d-val" style="font-size:14px;font-weight:400">${inv.notes}</div></div>` : ''}
       ${inv.monthly ? `<div class="detail-row full"><div class="d-lbl">Monthly instalment</div><div class="d-val">${fmt(inv.monthly)}</div></div>` : ''}
@@ -633,6 +636,7 @@ function editInvestment(id) {
     toggleOtherSource();
     if (inv.sourceCustom) document.getElementById('f-source-custom').value = inv.sourceCustom;
     document.getElementById('f-accno').value = inv.accno || '';
+    document.getElementById('f-investor').value = inv.investor || '';
     document.getElementById('f-principal').value = inv.principal;
     document.getElementById('f-principal').dataset.auto = inv.principal;
     if (inv.monthly) document.getElementById('f-monthly').value = inv.monthly;
@@ -728,7 +732,8 @@ function buildSummaryText() {
   if (urgent.length) {
     msg += `*⚠️ Maturing in next 90 days:*\n`;
     urgent.forEach(i => {
-      msg += `• ${i.name}\n  ${fmtDate(i.maturity)} · ${fmt(i.principal, true)}${i.matamt ? ' → ' + fmt(i.matamt, true) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
+      const invInfo = i.investor ? ` [${i.investor}]` : '';
+      msg += `• ${i.name}${invInfo}\n  ${fmtDate(i.maturity)} · ${fmt(i.principal, true)}${i.matamt ? ' → ' + fmt(i.matamt, true) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
     });
     msg += '\n';
   }
@@ -746,7 +751,7 @@ function shareOneWhatsApp(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
-  const msg = `📒 *Investment Details*\n\n*${inv.name}*\nInstitution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal, true)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+  const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal, true)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -759,7 +764,7 @@ function shareEmail() {
   if (urgent.length) {
     body += `UPCOMING MATURITIES (next 90 days):\n${'─'.repeat(40)}\n`;
     urgent.forEach(i => {
-      body += `• ${i.name}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${fmt(i.principal, true)}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt, true) : ''}\n\n`;
+      body += `• ${i.name}${i.investor ? ' (Investor: ' + i.investor + ')' : ''}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${fmt(i.principal, true)}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt, true) : ''}\n\n`;
     });
   }
   const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
