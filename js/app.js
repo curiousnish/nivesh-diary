@@ -667,7 +667,37 @@ function deleteInvestment(id) {
 /* ════════════════════════════════════════
    NOTIFICATIONS
 ═══════════════════════════════════════════ */
+async function checkNotifPermissionGranted() {
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('LocalNotifications')) {
+    try {
+      const perm = await window.Capacitor.Plugins.LocalNotifications.checkPermissions();
+      return perm.display === 'granted';
+    } catch (e) {
+      return false;
+    }
+  }
+  return ('Notification' in window) && Notification.permission === 'granted';
+}
+
 async function requestNotifPermission() {
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('LocalNotifications')) {
+    try {
+      const result = await window.Capacitor.Plugins.LocalNotifications.requestPermissions();
+      if (result.display === 'granted') {
+        data.settings.notifEnabled = true; save();
+        await scheduleNotifications();
+        toast('Notifications enabled! ✓');
+        dismissNotifPrompt();
+        updateNotifUI();
+      } else {
+        toast('Notification permission denied');
+      }
+    } catch (e) {
+      toast('Failed to request notification permission: ' + e.message);
+    }
+    return;
+  }
+
   if (!('Notification' in window)) { toast('Notifications not supported on this browser'); return; }
   const result = await Notification.requestPermission();
   if (result === 'granted') {
@@ -686,7 +716,63 @@ function dismissNotifPrompt() {
   sessionStorage.setItem('notif_dismissed', '1');
 }
 
-function scheduleNotifications() {
+async function scheduleNotifications() {
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('LocalNotifications')) {
+    if (!data.settings.notifEnabled) return;
+    const { LocalNotifications } = window.Capacitor.Plugins;
+    try {
+      const pending = await LocalNotifications.getPending();
+      if (pending.notifications.length > 0) {
+        await LocalNotifications.cancel(pending);
+      }
+
+      const listToSchedule = [];
+      data.investments.forEach((inv, index) => {
+        if (!inv.maturity) return;
+        
+        const matDate = new Date(inv.maturity);
+        matDate.setHours(10, 0, 0, 0); // 10 AM
+        
+        const reminderDays = inv.reminder || 30;
+        const triggerTime = matDate.getTime() - reminderDays * 24 * 60 * 60 * 1000;
+        
+        if (triggerTime > Date.now()) {
+          const title = reminderDays === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${reminderDays} days`;
+          const body  = `${fmt(inv.principal)} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+          
+          listToSchedule.push({
+            title,
+            body,
+            id: index + 1,
+            schedule: { at: new Date(triggerTime) },
+            extra: { investmentId: inv.id }
+          });
+        } else {
+          const dl = daysLeft(inv.maturity);
+          if (dl !== null && dl >= 0 && dl <= reminderDays) {
+            const title = dl === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${dl} days`;
+            const body  = `${fmt(inv.principal)} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+            
+            listToSchedule.push({
+              title,
+              body,
+              id: index + 1,
+              schedule: { at: new Date(Date.now() + 5000) },
+              extra: { investmentId: inv.id }
+            });
+          }
+        }
+      });
+
+      if (listToSchedule.length > 0) {
+        await LocalNotifications.schedule({ notifications: listToSchedule });
+      }
+    } catch (e) {
+      console.error('Failed to schedule local notifications', e);
+    }
+    return;
+  }
+
   if (!('serviceWorker' in navigator) || !data.settings.notifEnabled) return;
   if (Notification.permission !== 'granted') return;
 
@@ -714,8 +800,9 @@ function toggleNotifications() {
   }
 }
 
-function updateNotifUI() {
-  const on = data.settings.notifEnabled && Notification.permission === 'granted';
+async function updateNotifUI() {
+  const granted = await checkNotifPermissionGranted();
+  const on = data.settings.notifEnabled && granted;
   document.getElementById('notif-status-text').textContent = on ? 'Enabled — reminders active' : 'Tap to enable maturity reminders';
   document.getElementById('notif-toggle-btn').textContent = on ? 'Disable' : 'Enable';
 }
@@ -742,20 +829,45 @@ function buildSummaryText() {
   return msg;
 }
 
-function shareWhatsApp() {
+async function shareWhatsApp() {
   const msg = buildSummaryText();
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      await window.Capacitor.Plugins.Share.share({
+        title: 'Nivesh Diary Summary',
+        text: msg,
+        dialogTitle: 'Share via...'
+      });
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+  }
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-function shareOneWhatsApp(id) {
+async function shareOneWhatsApp(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
   const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal, true)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      await window.Capacitor.Plugins.Share.share({
+        title: 'Investment Details',
+        text: msg,
+        dialogTitle: 'Share Details...'
+      });
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+  }
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-function shareEmail() {
+async function shareEmail() {
   const invs = data.investments;
   const urgent = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; })
                       .sort((a,b) => new Date(a.maturity) - new Date(b.maturity));
@@ -769,6 +881,19 @@ function shareEmail() {
   }
   const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
   body += `\nTOTAL INVESTED: ${fmt(total, true)} across ${invs.length} investments\n\n— Sent from Nivesh Diary`;
+
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      await window.Capacitor.Plugins.Share.share({
+        title: subject,
+        text: body,
+        dialogTitle: 'Send Email Summary...'
+      });
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+  }
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
@@ -879,6 +1004,36 @@ async function exportData() {
       toast('Encryption failed: ' + e.message);
       return;
     }
+  }
+
+  // Check if we are running under Capacitor with Filesystem and Share plugins
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Filesystem') && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      const fileName = `nivesh-diary-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+
+      // Write to CACHE directory (does not require runtime permissions)
+      const result = await Filesystem.writeFile({
+        path: fileName,
+        data: outData,
+        directory: 'CACHE',
+        encoding: 'utf8'
+      });
+
+      // Share the file natively
+      await Share.share({
+        title: 'Nivesh Diary Backup',
+        text: 'Nivesh Diary investment backup file.',
+        url: result.uri,
+        dialogTitle: 'Save Backup File'
+      });
+
+      toast('Backup prepared ✓');
+    } catch (e) {
+      toast('Export failed: ' + e.message);
+      console.error(e);
+    }
+    return;
   }
 
   const blob = new Blob([outData], { type: 'application/json' });
@@ -1016,11 +1171,11 @@ function init() {
   updateHideUI();
 
   // Show notif prompt if not dismissed and not yet granted
-  if (!sessionStorage.getItem('notif_dismissed') &&
-      'Notification' in window &&
-      Notification.permission === 'default') {
-    document.getElementById('notif-prompt').classList.add('show');
-  }
+  checkNotifPermissionGranted().then(granted => {
+    if (!granted && !sessionStorage.getItem('notif_dismissed')) {
+      document.getElementById('notif-prompt').classList.add('show');
+    }
+  });
 
   renderHome();
 
@@ -1042,6 +1197,7 @@ function init() {
     renderHome();
     toast('Loaded with sample data — tap any card to explore 👆');
   }
+  scheduleNotifications();
 }
 
 init();

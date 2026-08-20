@@ -1,0 +1,6 @@
+{
+  "appId": "com.niveshdiary.app",
+  "appName": "Nivesh Diary",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
