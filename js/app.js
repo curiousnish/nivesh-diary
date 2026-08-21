@@ -50,9 +50,10 @@ function showPage(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'home')   renderHome();
-  if (name === 'list')   renderList();
-  if (name === 'alerts') renderAlerts();
+  if (name === 'home')     renderHome();
+  if (name === 'list')     renderList();
+  if (name === 'alerts')   renderAlerts();
+  if (name === 'settings') updateNotifUI();
 }
 
 /* ════════════════════════════════════════
@@ -1065,7 +1066,6 @@ async function decryptBackup(encryptedObj, password) {
 }
 
 async function exportData() {
-  closeSheet(null, 'backup-overlay', true);
   const pwd = await promptPassword("Encrypt Backup", "Enter an optional password to encrypt your backup (leave empty for no encryption):", "Optional Password");
   if (pwd === null) return; // User clicked Cancel
   
@@ -1125,9 +1125,6 @@ function importData(event) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      // Hide backup overlay so prompt is visible cleanly
-      closeSheet(null, 'backup-overlay', true);
-
       let imported = JSON.parse(e.target.result);
       
       // Decryption Logic
@@ -1177,20 +1174,8 @@ function confirmDeleteAll() {
   data.investments = [];
   save();
   toast('All data deleted');
-  closeSheet(null, 'backup-overlay', true);
   renderHome();
 }
-
-function openSheet(id) {
-  document.getElementById(id.includes('backup') ? 'backup-overlay' : id).classList.add('open');
-  updateNotifUI();
-}
-function closeSheet(e, id, force) {
-  if (force || !e || e.target === document.getElementById(id)) {
-    document.getElementById(id).classList.remove('open');
-  }
-}
-document.getElementById('backup-overlay').addEventListener('click', e => closeSheet(e, 'backup-overlay'));
 
 /* ════════════════════════════════════════
    PWA INSTALL

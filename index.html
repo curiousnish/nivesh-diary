@@ -29,9 +29,6 @@
     <div class="icon-btn" id="hide-toggle-btn" onclick="toggleHideAmounts()" title="Toggle Visibility">
       <img src="assets/visible_eye_icon.png" alt="Toggle Visibility">
     </div>
-    <div class="icon-btn" onclick="openSheet('backup-sheet')" title="Backup">
-      <img src="assets/gear_settings_wheel_icon.png" alt="Backup">
-    </div>
   </div>
 </nav>
 
@@ -274,6 +271,35 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════ -->
+<!-- PAGE: SETTINGS                      -->
+<!-- ═══════════════════════════════════ -->
+<div class="page" id="page-settings">
+  <div class="sec-head">Backup &amp; Settings</div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6">Keep a copy of your investment data safe. Backup regularly and store in Google Drive or WhatsApp.</p>
+
+  <div class="setting-row">
+    <div><div class="s-label">Export data (JSON)</div><div class="s-desc">Download all investments to your phone</div></div>
+    <button class="btn-sm" onclick="exportData()" style="background:var(--accent);color:white;border-color:var(--accent)">Export</button>
+  </div>
+  <div class="setting-row">
+    <div><div class="s-label">Import data (JSON)</div><div class="s-desc">Restore from a backup file</div></div>
+    <button class="btn-sm" onclick="document.getElementById('import-input').click()">Import</button>
+  </div>
+  <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+
+  <div class="setting-row">
+    <div><div class="s-label">Notifications</div><div class="s-desc" id="notif-status-text">Tap to enable maturity reminders</div></div>
+    <button class="btn-sm" id="notif-toggle-btn" onclick="toggleNotifications()">Enable</button>
+  </div>
+
+  <hr>
+  <div class="setting-row" style="border:none">
+    <div><div class="s-label" style="color:var(--red)">Delete all data</div><div class="s-desc">Permanently remove all investments</div></div>
+    <button class="btn-sm" style="color:var(--red);border-color:#FECACA" onclick="confirmDeleteAll()">Delete</button>
+  </div>
+</div>
+
 <!-- BOTTOM TABS -->
 <div class="tabs">
   <button class="tab active" id="tab-home"   onclick="showPage('home')">
@@ -291,6 +317,9 @@
       <div class="notif-dot" id="notif-dot"></div>
     </span>Alerts
   </button>
+  <button class="tab" id="tab-settings" onclick="showPage('settings')">
+    <span class="tab-icon"><img src="assets/gear_settings_wheel_icon.png" alt="Settings"></span>Settings
+  </button>
 </div>
 
 <!-- ═══════════════════════════════════ -->
@@ -300,38 +329,6 @@
   <div class="sheet" id="detail-sheet">
     <div class="sheet-handle"></div>
     <div id="detail-body"></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════ -->
-<!-- BACKUP SHEET                       -->
-<!-- ═══════════════════════════════════ -->
-<div class="overlay" id="backup-overlay" onclick="closeSheet(event,'backup-overlay')">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <h2 style="font-family:'Lora',serif;font-size:18px;margin-bottom:6px">Backup &amp; Settings</h2>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6">Keep a copy of your investment data safe. Backup regularly and store in Google Drive or WhatsApp.</p>
-
-    <div class="setting-row">
-      <div><div class="s-label">Export data (JSON)</div><div class="s-desc">Download all investments to your phone</div></div>
-      <button class="btn-sm" onclick="exportData()" style="background:var(--accent);color:white;border-color:var(--accent)">Export</button>
-    </div>
-    <div class="setting-row">
-      <div><div class="s-label">Import data (JSON)</div><div class="s-desc">Restore from a backup file</div></div>
-      <button class="btn-sm" onclick="document.getElementById('import-input').click()">Import</button>
-    </div>
-    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
-
-    <div class="setting-row">
-      <div><div class="s-label">Notifications</div><div class="s-desc" id="notif-status-text">Tap to enable maturity reminders</div></div>
-      <button class="btn-sm" id="notif-toggle-btn" onclick="toggleNotifications()">Enable</button>
-    </div>
-
-    <hr>
-    <div class="setting-row" style="border:none">
-      <div><div class="s-label" style="color:var(--red)">Delete all data</div><div class="s-desc">Permanently remove all investments</div></div>
-      <button class="btn-sm" style="color:var(--red);border-color:#FECACA" onclick="confirmDeleteAll()">Delete</button>
-    </div>
   </div>
 </div>
 
