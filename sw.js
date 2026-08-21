@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nivesh-diary-v8';
+const CACHE_NAME = 'nivesh-diary-v9';
 const ASSETS = [
   './',
   './index.html',

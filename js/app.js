@@ -129,12 +129,61 @@ function addMonths(dateStr, months) {
   return d.toISOString().split('T')[0];
 }
 
+function getRdPaidMonths(startStr, maturityStr) {
+  if (!startStr || !maturityStr) return 0;
+  const start = new Date(startStr);
+  const maturity = new Date(maturityStr);
+  const now = new Date();
+  
+  start.setHours(0,0,0,0);
+  maturity.setHours(0,0,0,0);
+  now.setHours(0,0,0,0);
+
+  if (now < start) return 0;
+  
+  const totalMonths = (maturity.getFullYear() - start.getFullYear()) * 12 + (maturity.getMonth() - start.getMonth());
+  
+  if (now >= maturity) {
+    return Math.max(1, totalMonths);
+  }
+
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (now.getDate() >= start.getDate()) {
+    months += 1;
+  }
+  
+  return Math.min(Math.max(1, months), Math.max(1, totalMonths));
+}
+
+function getInvestedPrincipal(inv) {
+  if (inv.type === 'RD') {
+    const start = new Date(inv.start);
+    const maturity = new Date(inv.maturity);
+    const totalMonths = (maturity.getFullYear() - start.getFullYear()) * 12 + (maturity.getMonth() - start.getMonth());
+    const monthly = Number(inv.monthly) || (totalMonths > 0 ? (Number(inv.principal || 0) / totalMonths) : 0);
+    if (monthly > 0) {
+      const paidMonths = getRdPaidMonths(inv.start, inv.maturity);
+      return Math.round(paidMonths * monthly);
+    }
+  }
+  return Number(inv.principal || 0);
+}
+
+function getRdProgress(inv) {
+  if (inv.type !== 'RD') return '';
+  const start = new Date(inv.start);
+  const maturity = new Date(inv.maturity);
+  const totalMonths = (maturity.getFullYear() - start.getFullYear()) * 12 + (maturity.getMonth() - start.getMonth());
+  const paidMonths = getRdPaidMonths(inv.start, inv.maturity);
+  return `${paidMonths}/${totalMonths} mos`;
+}
+
 /* ════════════════════════════════════════
    RENDER HOME
 ═══════════════════════════════════════════ */
 function renderHome() {
   const invs = data.investments;
-  const total = invs.reduce((s, i) => s + Number(i.principal || 0), 0);
+  const total = invs.reduce((s, i) => s + getInvestedPrincipal(i), 0);
   const upcoming = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; });
   const urgent   = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; });
 
@@ -224,7 +273,7 @@ function renderList() {
     if (!a.maturity) return 1; if (!b.maturity) return -1;
     return new Date(a.maturity) - new Date(b.maturity);
   });
-  else if (currentSort === 'amount') list.sort((a, b) => Number(b.principal) - Number(a.principal));
+  else if (currentSort === 'amount') list.sort((a, b) => getInvestedPrincipal(b) - getInvestedPrincipal(a));
   else list.sort((a, b) => b.addedAt - a.addedAt);
 
   document.getElementById('list-body').innerHTML = list.length
@@ -248,6 +297,13 @@ function invCard(inv) {
   const typeLabel = (SCHEME_INFO[inv.type] || {}).label || inv.type;
   const source = inv.sourceCustom || inv.source || '';
   const investorInfo = inv.investor ? `👤 ${inv.investor} · ` : '';
+
+  let rateLabel = inv.rate ? inv.rate + '% p.a.' : typeLabel;
+  if (inv.type === 'RD') {
+    const progress = getRdProgress(inv);
+    rateLabel = `${inv.rate ? inv.rate + '% p.a. · ' : ''}${progress}`;
+  }
+
   return `
   <div class="inv-card" onclick="openDetail('${inv.id}')">
     <div class="inv-card-top">
@@ -256,8 +312,8 @@ function invCard(inv) {
         <div class="inv-source">${investorInfo}${source}${inv.accno ? ' · ' + inv.accno : ''}</div>
       </div>
       <div class="inv-card-right">
-        <div class="inv-amount">${fmt(inv.principal)}</div>
-        <div class="inv-rate">${inv.rate ? inv.rate + '% p.a.' : typeLabel}</div>
+        <div class="inv-amount">${fmt(getInvestedPrincipal(inv))}</div>
+        <div class="inv-rate">${rateLabel}</div>
       </div>
     </div>
     <div class="inv-card-bottom">
@@ -297,7 +353,7 @@ function renderAlerts() {
               <div style="font-size:12px;color:var(--muted);margin-top:2px">${i.sourceCustom||i.source} · Matures ${fmtDate(i.maturity)}</div>
             </div>
             <div style="text-align:right">
-              <div style="font-size:14px;font-weight:700;color:var(--accent)">${fmt(i.principal)}</div>
+              <div style="font-size:14px;font-weight:700;color:var(--accent)">${fmt(getInvestedPrincipal(i))}</div>
               <div style="font-size:11px;color:var(--muted)">${maturityLabel(daysLeft(i.maturity))}</div>
             </div>
           </div>
@@ -593,7 +649,12 @@ function openDetail(id) {
       <span class="mat-chip ${cls}">${lbl || 'Active'}</span>
     </div>
     <div class="detail-grid">
-      <div class="detail-row"><div class="d-lbl">Principal</div><div class="d-val" style="color:var(--accent)">${fmt(inv.principal)}</div></div>
+      ${inv.type === 'RD' ? `
+        <div class="detail-row"><div class="d-lbl">Principal (Paid so far)</div><div class="d-val" style="color:var(--accent)">${fmt(getInvestedPrincipal(inv))}</div></div>
+        <div class="detail-row"><div class="d-lbl">Total Principal</div><div class="d-val">${fmt(inv.principal)}</div></div>
+      ` : `
+        <div class="detail-row"><div class="d-lbl">Principal</div><div class="d-val" style="color:var(--accent)">${fmt(inv.principal)}</div></div>
+      `}
       <div class="detail-row"><div class="d-lbl">Type</div><div class="d-val">${(SCHEME_INFO[inv.type]||{}).label||inv.type}</div></div>
       <div class="detail-row"><div class="d-lbl">Interest rate</div><div class="d-val">${inv.rate ? inv.rate + '% p.a.' : '—'}</div></div>
       <div class="detail-row"><div class="d-lbl">Maturity amount</div><div class="d-val" style="color:var(--accent)">${fmt(inv.matamt)}</div></div>
@@ -738,7 +799,7 @@ async function scheduleNotifications() {
         
         if (triggerTime > Date.now()) {
           const title = reminderDays === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${reminderDays} days`;
-          const body  = `${fmt(inv.principal)} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+          const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
           
           listToSchedule.push({
             title,
@@ -751,7 +812,7 @@ async function scheduleNotifications() {
           const dl = daysLeft(inv.maturity);
           if (dl !== null && dl >= 0 && dl <= reminderDays) {
             const title = dl === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${dl} days`;
-            const body  = `${fmt(inv.principal)} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+            const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
             
             listToSchedule.push({
               title,
@@ -783,7 +844,7 @@ async function scheduleNotifications() {
       const reminderAt = inv.reminder || 30;
       if (dl !== null && dl >= 0 && dl <= reminderAt) {
         const title = dl === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${dl} days`;
-        const body  = `${fmt(inv.principal)} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+        const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
         reg.active && reg.active.postMessage({ type: 'SCHEDULE_NOTIFICATION', title, body, delay: 2000 });
       }
     });
@@ -820,11 +881,11 @@ function buildSummaryText() {
     msg += `*⚠️ Maturing in next 90 days:*\n`;
     urgent.forEach(i => {
       const invInfo = i.investor ? ` [${i.investor}]` : '';
-      msg += `• ${i.name}${invInfo}\n  ${fmtDate(i.maturity)} · ${fmt(i.principal, true)}${i.matamt ? ' → ' + fmt(i.matamt, true) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
+      msg += `• ${i.name}${invInfo}\n  ${fmtDate(i.maturity)} · ${fmt(getInvestedPrincipal(i), true)}${i.matamt ? ' → ' + fmt(i.matamt, true) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
     });
     msg += '\n';
   }
-  const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
+  const total = invs.reduce((s,i) => s + getInvestedPrincipal(i), 0);
   msg += `*Total invested: ${fmt(total, true)}* across ${invs.length} investments`;
   return msg;
 }
@@ -850,7 +911,10 @@ async function shareOneWhatsApp(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
-  const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal, true)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+  const principalStr = inv.type === 'RD'
+    ? `${fmt(getInvestedPrincipal(inv), true)} (Total: ${fmt(inv.principal, true)})`
+    : fmt(inv.principal, true);
+  const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${principalStr}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
 
   if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
     try {
@@ -876,10 +940,13 @@ async function shareEmail() {
   if (urgent.length) {
     body += `UPCOMING MATURITIES (next 90 days):\n${'─'.repeat(40)}\n`;
     urgent.forEach(i => {
-      body += `• ${i.name}${i.investor ? ' (Investor: ' + i.investor + ')' : ''}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${fmt(i.principal, true)}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt, true) : ''}\n\n`;
+      const principalStr = i.type === 'RD'
+        ? `${fmt(getInvestedPrincipal(i), true)} (Total: ${fmt(i.principal, true)})`
+        : fmt(i.principal, true);
+      body += `• ${i.name}${i.investor ? ' (Investor: ' + i.investor + ')' : ''}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${principalStr}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt, true) : ''}\n\n`;
     });
   }
-  const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
+  const total = invs.reduce((s,i) => s + getInvestedPrincipal(i), 0);
   body += `\nTOTAL INVESTED: ${fmt(total, true)} across ${invs.length} investments\n\n— Sent from Nivesh Diary`;
 
   if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
@@ -1189,6 +1256,7 @@ function init() {
       { type:'NSC',  source:'India Post / Post Office',  principal:50000,  rate:7.7, start: fmt2(new Date(today.getFullYear()-3, 4, 15)), maturity: fmt2(new Date(today.getFullYear()+2, 4, 15)), matamt:71893 },
       { type:'KVP',  source:'India Post / Post Office',  principal:100000, rate:null, start: fmt2(new Date(today.getFullYear()-2, 0, 10)), maturity: fmt2(new Date(today.getFullYear()+7, 7, 10)), matamt:200000, notes:'Certificate no. KVP-2022-10012' },
       { type:'SCSS', source:'State Bank of India (SBI)', principal:300000, rate:8.2, start: fmt2(new Date(today.getFullYear()-1, 6, 1)), maturity: fmt2(new Date(today.getFullYear()+4, 6, 1)), matamt:435960, notes:'Quarterly interest payout to savings account.' },
+      { type:'RD',   source:'HDFC Bank',                 principal:120000, rate:6.5, start: fmt2(new Date(today.getFullYear(), today.getMonth()-6, today.getDate())), maturity: fmt2(addMonths2(today, 18)), matamt:128500, monthly:5000, notes:'Monthly contribution via SI.' },
     ];
     samples.forEach(s => {
       data.investments.push({ id: uid(), name: `${(SCHEME_INFO[s.type]||{}).label||s.type} — ${s.source}`, addedAt: Date.now()-Math.random()*1e9, reminder: 30, accno:'', monthly:null, sourceCustom:'', ...s });
