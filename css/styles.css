@@ -65,6 +65,11 @@ input, select, textarea, button { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; font-size: 16px;
 }
+.icon-btn img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
 .notif-badge-wrap { position: relative; }
 .notif-dot {
   position: absolute; top: -3px; right: -3px;
@@ -92,6 +97,12 @@ input, select, textarea, button { font-family: inherit; }
 }
 .tab.active { color: var(--accent); }
 .tab-icon { font-size: 20px; margin-bottom: 3px; }
+.tab-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
 .tab-badge {
   position: absolute; top: 5px; right: calc(50% - 18px);
   background: var(--red); color: white;

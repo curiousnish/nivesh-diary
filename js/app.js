@@ -87,8 +87,9 @@ function toggleHideAmounts() {
 function updateHideUI() {
   const btn = document.getElementById('hide-toggle-btn');
   if (btn) {
-    btn.textContent = data.settings.hideAmounts ? '🔒' : '👁️';
-    btn.title = data.settings.hideAmounts ? 'Show Amounts' : 'Hide Amounts';
+    const isHidden = data.settings.hideAmounts;
+    btn.innerHTML = `<img src="${isHidden ? 'assets/eye_closed_icon.png' : 'assets/visible_eye_icon.png'}" alt="Visibility Status">`;
+    btn.title = isHidden ? 'Show Amounts' : 'Hide Amounts';
   }
 }
 function fmtDate(d) {

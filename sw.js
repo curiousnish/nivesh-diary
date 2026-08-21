@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nivesh-diary-v9';
+const CACHE_NAME = 'nivesh-diary-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -7,7 +7,14 @@ const ASSETS = [
   './js/app.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './assets/eye_closed_icon.png',
+  './assets/visible_eye_icon.png',
+  './assets/dashboard_icon.png',
+  './assets/gear_settings_wheel_icon.png',
+  './assets/home_icon.png',
+  './assets/notifications_active_icon.png',
+  './assets/plus_add_insert_icon.png'
 ];
 
 self.addEventListener('install', e => {

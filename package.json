@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Nivesh Diary - Android PWA App",
   "scripts": {
-    "build": "rm -rf www && mkdir -p www && cp index.html manifest.json sw.js www/ && cp -r css js icons www/",
+    "build": "rm -rf www && mkdir -p www && cp index.html manifest.json sw.js www/ && cp -r css js icons assets www/",
     "cap:sync": "cap sync"
   },
   "dependencies": {
