@@ -54,6 +54,13 @@ input, select, textarea, button { font-family: inherit; }
   width: 36px; height: 36px; border-radius: 10px;
   background: var(--accent); display: flex; align-items: center; justify-content: center;
   font-size: 18px;
+  overflow: hidden;
+}
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 .brand-text { line-height: 1.2; }
 .brand-name { font-family: 'Lora', serif; font-size: 17px; font-weight: 700; color: var(--accent); }
