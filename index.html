@@ -29,12 +29,6 @@
     <div class="icon-btn" id="hide-toggle-btn" onclick="toggleHideAmounts()" title="Toggle Visibility">
       <img src="assets/visible_eye_icon.png" alt="Toggle Visibility">
     </div>
-    <div class="notif-badge-wrap">
-      <div class="icon-btn" onclick="showPage('alerts')" title="Alerts">
-        <img src="assets/notifications_active_icon.png" alt="Alerts">
-      </div>
-      <div class="notif-dot" id="notif-dot"></div>
-    </div>
     <div class="icon-btn" onclick="openSheet('backup-sheet')" title="Backup">
       <img src="assets/gear_settings_wheel_icon.png" alt="Backup">
     </div>
@@ -292,8 +286,10 @@
     <span class="tab-icon"><img src="assets/plus_add_insert_icon.png" alt="Add New"></span>Add New
   </button>
   <button class="tab" id="tab-alerts" onclick="showPage('alerts')">
-    <span class="tab-icon"><img src="assets/notifications_active_icon.png" alt="Alerts"></span>Alerts
-    <span class="tab-badge" id="alert-badge" style="display:none">0</span>
+    <span class="tab-icon">
+      <img src="assets/notifications_active_icon.png" alt="Alerts">
+      <div class="notif-dot" id="notif-dot"></div>
+    </span>Alerts
   </button>
 </div>
 

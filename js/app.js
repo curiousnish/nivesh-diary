@@ -258,9 +258,14 @@ function renderHome() {
   // Update badge
   const badgeCount = urgent.length + soon60.length;
   const badge = document.getElementById('alert-badge');
-  badge.textContent = badgeCount;
-  badge.style.display = badgeCount ? 'flex' : 'none';
-  document.getElementById('notif-dot').classList.toggle('show', badgeCount > 0);
+  if (badge) {
+    badge.textContent = badgeCount;
+    badge.style.display = badgeCount ? 'flex' : 'none';
+  }
+  const notifDot = document.getElementById('notif-dot');
+  if (notifDot) {
+    notifDot.classList.toggle('show', badgeCount > 0);
+  }
 }
 
 /* ════════════════════════════════════════

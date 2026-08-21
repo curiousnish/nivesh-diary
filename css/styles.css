@@ -96,7 +96,7 @@ input, select, textarea, button { font-family: inherit; }
   transition: color 0.15s; position: relative;
 }
 .tab.active { color: var(--accent); }
-.tab-icon { font-size: 20px; margin-bottom: 3px; }
+.tab-icon { font-size: 20px; margin-bottom: 3px; position: relative; display: inline-flex; }
 .tab-icon img {
   width: 20px;
   height: 20px;
