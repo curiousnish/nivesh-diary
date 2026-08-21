@@ -4,6 +4,7 @@
 const STORE_KEY = 'nivesh_diary_v2';
 let data = { investments: [], settings: { reminderDays: 30, notifEnabled: false, hideAmounts: false } };
 let editingId = null;
+let rolloverFromId = null;
 let filterState = {
   search: '',
   types: [],
@@ -193,25 +194,47 @@ function getRdProgress(inv) {
 ═══════════════════════════════════════════ */
 function renderHome() {
   const invs = data.investments;
-  const total = invs.reduce((s, i) => s + getInvestedPrincipal(i), 0);
-  const upcoming = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; });
-  const urgent   = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; });
+  const activeInvs = invs.filter(i => i.status !== 'closed');
+  
+  // Invested Portfolio: Active running (maturity date is in the future or today)
+  const activeRunningInvs = activeInvs.filter(i => {
+    const d = daysLeft(i.maturity);
+    return d !== null && d >= 0;
+  });
+
+  // Matured Portfolio: Active but matured (maturity date in the past, status not closed)
+  const maturedUnclosedInvs = activeInvs.filter(i => {
+    const d = daysLeft(i.maturity);
+    return d !== null && d < 0;
+  });
+
+  const investedVal = activeRunningInvs.reduce((s, i) => s + getInvestedPrincipal(i), 0);
+  const maturedVal = maturedUnclosedInvs.reduce((s, i) => s + Number(i.matamt || i.principal || 0), 0);
+  const totalVal = investedVal + maturedVal;
+
+  const upcoming = activeInvs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; });
+  const urgent   = activeInvs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; });
 
   document.getElementById('home-stats').innerHTML = `
     <div class="stat-card">
-      <div class="stat-lbl">Total Invested</div>
-      <div class="stat-val green">${fmt(total)}</div>
-      <div class="stat-sub">${invs.length} investment${invs.length !== 1 ? 's' : ''}</div>
+      <div class="stat-lbl">Invested Portfolio</div>
+      <div class="stat-val green">${fmt(investedVal)}</div>
+      <div class="stat-sub">${activeRunningInvs.length} active investment${activeRunningInvs.length !== 1 ? 's' : ''}</div>
     </div>
     <div class="stat-card">
+      <div class="stat-lbl">Total Portfolio</div>
+      <div class="stat-val green">${fmt(totalVal)}</div>
+      <div class="stat-sub">${activeInvs.length} current investment${activeInvs.length !== 1 ? 's' : ''}${maturedUnclosedInvs.length ? ` (${maturedUnclosedInvs.length} matured)` : ''}</div>
+    </div>
+    <div class="stat-card wide">
       <div class="stat-lbl">Maturing in 90 days</div>
       <div class="stat-val ${urgent.length ? 'red' : 'amber'}">${upcoming.length}</div>
       <div class="stat-sub">${urgent.length} urgent (≤30 days)</div>
     </div>
     <div class="stat-card wide">
-      <div class="stat-lbl">Expected maturity value (of tracked)</div>
-      <div class="stat-val green">${fmt(invs.reduce((s,i) => s + Number(i.matamt || i.principal || 0), 0))}</div>
-      <div class="stat-sub">across ${invs.filter(i=>i.matamt).length} investments with known returns</div>
+      <div class="stat-lbl">Expected maturity value (of current portfolio)</div>
+      <div class="stat-val green">${fmt(activeInvs.reduce((s,i) => s + Number(i.matamt || i.principal || 0), 0))}</div>
+      <div class="stat-sub">across ${activeInvs.filter(i=>i.matamt).length} investments with known returns</div>
     </div>
   `;
 
@@ -226,7 +249,7 @@ function renderHome() {
       </div>
     </div>`;
   }
-  const soon60 = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; });
+  const soon60 = activeInvs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; });
   if (soon60.length) {
     alerts += `<div class="alert-banner amber">
       <div class="alert-icon">⚠️</div>
@@ -236,13 +259,12 @@ function renderHome() {
       </div>
     </div>`;
   }
-  const matured = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; });
-  if (matured.length) {
+  if (maturedUnclosedInvs.length) {
     alerts += `<div class="alert-banner green">
       <div class="alert-icon">✅</div>
       <div class="alert-body">
-        <div class="alert-title">${matured.length} investment${matured.length>1?'s':''} already matured</div>
-        <div class="alert-desc">Please update or archive: ${matured.map(i=>i.name).join(', ')}</div>
+        <div class="alert-title">${maturedUnclosedInvs.length} investment${maturedUnclosedInvs.length>1?'s':''} already matured</div>
+        <div class="alert-desc">Please update, reinvest, or mark as settled: ${maturedUnclosedInvs.map(i=>i.name).join(', ')}</div>
       </div>
     </div>`;
   }
@@ -258,8 +280,8 @@ function renderHome() {
     ? sorted.map(i => invCard(i)).join('')
     : `<div style="padding:16px;text-align:center;color:var(--muted);font-size:14px">No maturities in the next 90 days 🎉</div>`;
 
-  // Recent (last 4)
-  const recent = [...invs].sort((a,b) => b.addedAt - a.addedAt).slice(0, 4);
+  // Recent (last 4 active)
+  const recent = [...activeInvs].sort((a,b) => b.addedAt - a.addedAt).slice(0, 4);
   document.getElementById('home-recent').innerHTML = recent.length
     ? recent.map(i => invCard(i)).join('')
     : `<div class="empty-state"><div class="empty-icon">📒</div><h3>Nothing here yet</h3><p>Tap <strong>Add New</strong> to record your first investment.</p></div>`;
@@ -321,13 +343,18 @@ function renderList() {
   if (filterState.status.length > 0) {
     list = list.filter(i => {
       const dl = daysLeft(i.maturity);
+      const isClosed = i.status === 'closed';
       return filterState.status.some(st => {
-        if (st === 'active') return dl !== null && dl >= 0;
-        if (st === 'matured') return dl !== null && dl < 0;
-        if (st === 'soon') return dl !== null && dl >= 0 && dl <= 30;
-        return true;
+        if (st === 'active') return !isClosed && dl !== null && dl >= 0;
+        if (st === 'matured') return !isClosed && dl !== null && dl < 0;
+        if (st === 'soon') return !isClosed && dl !== null && dl >= 0 && dl <= 30;
+        if (st === 'closed') return isClosed;
+        return false;
       });
     });
+  } else {
+    // By default, hide closed/settled investments from the main portfolio list
+    list = list.filter(i => i.status !== 'closed');
   }
 
   // 6. Sorting
@@ -523,6 +550,7 @@ function renderFilterSheet() {
         <button type="button" class="chip-btn ${tempFilterState.status.includes('active') ? 'selected' : ''}" onclick="toggleTempStatus('active')">Active</button>
         <button type="button" class="chip-btn ${tempFilterState.status.includes('matured') ? 'selected' : ''}" onclick="toggleTempStatus('matured')">Matured</button>
         <button type="button" class="chip-btn ${tempFilterState.status.includes('soon') ? 'selected' : ''}" onclick="toggleTempStatus('soon')">Maturing soon (≤30 days)</button>
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('closed') ? 'selected' : ''}" onclick="toggleTempStatus('closed')">Closed / Settled</button>
       </div>
     </div>
   `;
@@ -597,7 +625,7 @@ function updateActiveFiltersBar() {
   
   if (filterState.status.length > 0) {
     count += filterState.status.length;
-    const statusLabels = { active: 'Active', matured: 'Matured', soon: 'Maturing soon' };
+    const statusLabels = { active: 'Active', matured: 'Matured', soon: 'Maturing soon', closed: 'Closed / Settled' };
     const labels = filterState.status.map(s => statusLabels[s] || s).join(', ');
     tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('status')">Status: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
   }
@@ -655,9 +683,10 @@ function clearAllFilters() {
 ═══════════════════════════════════════════ */
 function invCard(inv) {
   const dl = daysLeft(inv.maturity);
-  const cls = maturityClass(dl);
-  const lbl = maturityLabel(dl);
+  const isClosed = inv.status === 'closed';
+  const cls = isClosed ? 'closed' : maturityClass(dl);
   const typeLabel = (SCHEME_INFO[inv.type] || {}).label || inv.type;
+  const lbl = isClosed ? 'Settled' : (maturityLabel(dl) || typeLabel);
   const source = inv.sourceCustom || inv.source || '';
   const investorInfo = inv.investor ? `👤 ${inv.investor} · ` : '';
 
@@ -668,7 +697,7 @@ function invCard(inv) {
   }
 
   return `
-  <div class="inv-card" onclick="openDetail('${inv.id}')">
+  <div class="inv-card ${isClosed ? 'is-closed' : ''}" onclick="openDetail('${inv.id}')">
     <div class="inv-card-top">
       <div class="inv-card-left">
         <div class="inv-name">${inv.name}</div>
@@ -684,7 +713,7 @@ function invCard(inv) {
         <div class="inv-mat-label">Matures on</div>
         <div class="inv-mat-date">${fmtDate(inv.maturity)}</div>
       </div>
-      <span class="mat-chip ${cls}">${lbl || typeLabel}</span>
+      <span class="mat-chip ${cls}">${lbl}</span>
     </div>
   </div>`;
 }
@@ -693,7 +722,7 @@ function invCard(inv) {
    RENDER ALERTS
 ═══════════════════════════════════════════ */
 function renderAlerts() {
-  const invs = data.investments;
+  const invs = data.investments.filter(i => i.status !== 'closed');
   const groups = [
     { label: '🚨 Maturing within 30 days', cls: 'red',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; }) },
     { label: '⚠️ Maturing in 31–60 days',  cls: 'amber', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; }) },
@@ -735,6 +764,7 @@ function renderAlerts() {
 ═══════════════════════════════════════════ */
 function newInvestment() {
   editingId = null;
+  rolloverFromId = null;
   document.getElementById('form-heading').textContent = '📝 Add New Investment';
   document.getElementById('save-btn').textContent = 'Save Investment';
   clearForm();
@@ -955,6 +985,9 @@ function saveInvestment() {
   const typeLabel = (SCHEME_INFO[type]||{}).label || type;
   const autoName = `${typeLabel} — ${sourceLabel}`;
 
+  const editingInv = editingId ? data.investments.find(i=>i.id===editingId) : null;
+  const status = editingInv ? (editingInv.status || 'active') : 'active';
+
   const inv = {
     id: editingId || uid(),
     name: autoName,
@@ -968,7 +1001,8 @@ function saveInvestment() {
     matamt:    parseFloat(document.getElementById('f-matamt').value) || null,
     reminder:  parseInt(document.getElementById('f-reminder').value),
     notes:     document.getElementById('f-notes').value.trim(),
-    addedAt:   editingId ? (data.investments.find(i=>i.id===editingId)||{}).addedAt : Date.now()
+    addedAt:   editingId ? (editingInv||{}).addedAt : Date.now(),
+    status
   };
 
   if (editingId) {
@@ -978,6 +1012,14 @@ function saveInvestment() {
   } else {
     data.investments.push(inv);
     toast('Investment saved ✓');
+
+    if (rolloverFromId) {
+      const oldIdx = data.investments.findIndex(i => i.id === rolloverFromId);
+      if (oldIdx > -1) {
+        data.investments[oldIdx].status = 'closed';
+      }
+      rolloverFromId = null;
+    }
   }
   save();
   scheduleNotifications();
@@ -988,6 +1030,7 @@ function saveInvestment() {
 
 function cancelForm() {
   editingId = null;
+  rolloverFromId = null;
   clearForm();
   showPage('home');
 }
@@ -999,8 +1042,9 @@ function openDetail(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
-  const cls = maturityClass(dl);
-  const lbl = maturityLabel(dl);
+  const isClosed = inv.status === 'closed';
+  const cls = isClosed ? 'closed' : maturityClass(dl);
+  const lbl = isClosed ? 'Settled' : (maturityLabel(dl) || 'Active');
   const source = inv.sourceCustom || inv.source || '';
 
   document.getElementById('detail-body').innerHTML = `
@@ -1009,7 +1053,7 @@ function openDetail(id) {
         <div class="detail-title">${inv.name}</div>
         <div class="detail-source">${source}</div>
       </div>
-      <span class="mat-chip ${cls}">${lbl || 'Active'}</span>
+      <span class="mat-chip ${cls}">${lbl}</span>
     </div>
     <div class="detail-grid">
       ${inv.type === 'RD' ? `
@@ -1029,6 +1073,14 @@ function openDetail(id) {
       ${inv.monthly ? `<div class="detail-row full"><div class="d-lbl">Monthly instalment</div><div class="d-val">${fmt(inv.monthly)}</div></div>` : ''}
     </div>
     <div class="detail-actions">
+      ${!isClosed ? `
+        <button class="btn btn-primary" onclick="settleInvestment('${inv.id}')">✅ Mark as Settled / Closed</button>
+        ${dl !== null && dl <= 0 ? `
+          <button class="btn" style="background:#0b8478; color:white; border:none;" onclick="rolloverInvestment('${inv.id}')">🔄 Reinvest / Roll Over</button>
+        ` : ''}
+      ` : `
+        <button class="btn btn-primary" onclick="reopenInvestment('${inv.id}')">🔓 Reopen Investment</button>
+      `}
       <button class="btn btn-outline" onclick="editInvestment('${inv.id}')">✏️ Edit</button>
       <button class="btn btn-danger" onclick="deleteInvestment('${inv.id}')">🗑️ Delete</button>
     </div>
@@ -1086,6 +1138,76 @@ function deleteInvestment(id) {
   toast('Investment deleted');
   renderHome();
   renderList();
+}
+
+function settleInvestment(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  inv.status = 'closed';
+  save();
+  scheduleNotifications();
+  document.getElementById('detail-overlay').classList.remove('open');
+  toast('Investment marked as Settled ✓');
+  renderHome();
+  renderList();
+}
+
+function reopenInvestment(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  inv.status = 'active';
+  save();
+  scheduleNotifications();
+  document.getElementById('detail-overlay').classList.remove('open');
+  toast('Investment reopened ✓');
+  renderHome();
+  renderList();
+}
+
+function rolloverInvestment(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  
+  // Set global rolloverFromId to auto-close this on save
+  rolloverFromId = id;
+  
+  document.getElementById('detail-overlay').classList.remove('open');
+  editingId = null;
+  document.getElementById('form-heading').textContent = '🔄 Roll Over Investment';
+  document.getElementById('save-btn').textContent = 'Save Roll Over';
+  clearForm();
+  
+  setTimeout(() => {
+    document.getElementById('f-type').value = inv.type;
+    onTypeChange();
+    document.getElementById('f-source').value = inv.source;
+    toggleOtherSource();
+    if (inv.sourceCustom) document.getElementById('f-source-custom').value = inv.sourceCustom;
+    document.getElementById('f-investor').value = inv.investor || '';
+    
+    // Principal prefilled with matured amount (or principal if not set)
+    const rolledPrincipal = inv.matamt || inv.principal;
+    document.getElementById('f-principal').value = rolledPrincipal;
+    document.getElementById('f-principal').dataset.auto = rolledPrincipal;
+    
+    // Start date is the maturity date of the old investment
+    document.getElementById('f-start').value = inv.maturity || '';
+    
+    // Autofill notes with rollover lineage details
+    document.getElementById('f-notes').value = `Rolled over from: ${inv.name} (Ref: ${inv.accno || 'N/A'})\nPrevious Principal: ${fmt(inv.principal, true)}, Matured: ${fmt(rolledPrincipal, true)}`;
+    
+    // Highlight and focus the principal input so user can add increment
+    const principalEl = document.getElementById('f-principal');
+    if (principalEl) {
+      principalEl.focus();
+      principalEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    calcMaturity();
+  }, 100);
+  
+  toast('Old investment will close when you save this rollover.');
+  showPage('add');
 }
 
 /* ════════════════════════════════════════
@@ -1152,7 +1274,7 @@ async function scheduleNotifications() {
 
       const listToSchedule = [];
       data.investments.forEach((inv, index) => {
-        if (!inv.maturity) return;
+        if (!inv.maturity || inv.status === 'closed') return;
         
         const matDate = new Date(inv.maturity);
         matDate.setHours(10, 0, 0, 0); // 10 AM
@@ -1202,7 +1324,7 @@ async function scheduleNotifications() {
 
   navigator.serviceWorker.ready.then(reg => {
     data.investments.forEach(inv => {
-      if (!inv.maturity) return;
+      if (!inv.maturity || inv.status === 'closed') return;
       const dl = daysLeft(inv.maturity);
       const reminderAt = inv.reminder || 30;
       if (dl !== null && dl >= 0 && dl <= reminderAt) {
@@ -1235,7 +1357,7 @@ async function updateNotifUI() {
    SHARE
 ═══════════════════════════════════════════ */
 function buildSummaryText() {
-  const invs = data.investments;
+  const invs = data.investments.filter(i => i.status !== 'closed');
   const urgent = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; })
                       .sort((a,b) => new Date(a.maturity) - new Date(b.maturity));
   let msg = `*📒 Nivesh Diary — Investment Summary*\n`;
@@ -1274,10 +1396,12 @@ async function shareOneWhatsApp(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
+  const isClosed = inv.status === 'closed';
   const principalStr = inv.type === 'RD'
     ? `${fmt(getInvestedPrincipal(inv), true)} (Total: ${fmt(inv.principal, true)})`
     : fmt(inv.principal, true);
-  const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${principalStr}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+  const statusStr = isClosed ? 'Settled' : (maturityLabel(dl) || 'Active');
+  const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${principalStr}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${statusStr}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
 
   if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
     try {
@@ -1295,7 +1419,7 @@ async function shareOneWhatsApp(id) {
 }
 
 async function shareEmail() {
-  const invs = data.investments;
+  const invs = data.investments.filter(i => i.status !== 'closed');
   const urgent = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; })
                       .sort((a,b) => new Date(a.maturity) - new Date(b.maturity));
   const subject = `Investment Maturity Alert — ${new Date().toLocaleDateString('en-IN')}`;

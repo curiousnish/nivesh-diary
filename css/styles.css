@@ -192,6 +192,14 @@ input, select, textarea, button { font-family: inherit; }
   -webkit-user-select: none; user-select: none;
 }
 .inv-card:active { border-color: var(--accent); box-shadow: var(--shadow); }
+.inv-card.is-closed {
+  opacity: 0.65;
+  background: var(--surface2);
+  border-style: dashed;
+}
+.inv-card.is-closed .inv-amount {
+  color: var(--muted);
+}
 .inv-card-top {
   padding: 14px 16px 12px;
   display: flex; justify-content: space-between; align-items: flex-start;
@@ -221,6 +229,7 @@ input, select, textarea, button { font-family: inherit; }
 .mat-chip.upcoming { background: var(--gold-lt);   color: var(--gold);   }
 .mat-chip.safe     { background: var(--accent-lt); color: var(--accent); }
 .mat-chip.matured  { background: #F3F4F6;           color: var(--muted);  }
+.mat-chip.closed   { background: #E5E7EB;           color: #6B7280;       }
 
 /* ── FILTER CHIPS ─────────────────────────── */
 .filters {
