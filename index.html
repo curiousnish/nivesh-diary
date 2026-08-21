@@ -80,27 +80,24 @@
 <!-- PAGE: MY INVESTMENTS               -->
 <!-- ═══════════════════════════════════ -->
 <div class="page" id="page-list">
-  <div class="filters" id="list-filters">
-    <button class="fchip on" data-f="all"  onclick="setFilter(this)">All</button>
-    <button class="fchip"    data-f="FD"   onclick="setFilter(this)">Fixed Deposit</button>
-    <button class="fchip"    data-f="RD"   onclick="setFilter(this)">Recurring Dep.</button>
-    <button class="fchip"    data-f="TD"   onclick="setFilter(this)">Term Deposit</button>
-    <button class="fchip"    data-f="NSC"  onclick="setFilter(this)">NSC</button>
-    <button class="fchip"    data-f="KVP"  onclick="setFilter(this)">KVP</button>
-    <button class="fchip"    data-f="MIS"  onclick="setFilter(this)">MIS</button>
-    <button class="fchip"    data-f="PPF"  onclick="setFilter(this)">PPF</button>
-    <button class="fchip"    data-f="SCSS" onclick="setFilter(this)">SCSS</button>
-    <button class="fchip"    data-f="Bond" onclick="setFilter(this)">Bond</button>
-    <button class="fchip"    data-f="Other" onclick="setFilter(this)">Other</button>
+  <div class="list-header-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="font-family:'Lora',serif; font-size:16px; font-weight:600; color:var(--text);">My Investments</h2>
+    <button class="btn-sm" onclick="openFilterSheet()" style="display:flex; align-items:center; gap:6px;">
+      <span>🎛️</span> Filter & Sort
+      <span id="filter-badge" style="display:none; background:var(--accent); color:white; font-size:10px; font-weight:bold; min-width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center;">0</span>
+    </button>
   </div>
-  <div class="sort-bar">
-    <label>Sort by</label>
-    <select onchange="currentSort=this.value; renderList()">
-      <option value="maturity">Maturity date</option>
-      <option value="amount">Amount (high-low)</option>
-      <option value="added">Recently added</option>
-    </select>
+  
+  <!-- Search Input Field -->
+  <div class="field" style="margin-bottom: 12px; position: relative;">
+    <input type="text" id="list-search" placeholder="🔍 Search name, bank, investor, notes..." oninput="onSearchInput(this.value)" style="padding-left: 36px; padding-right: 36px;">
+    <button id="search-clear-btn" onclick="clearSearch()" style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; font-size:16px; color:var(--muted); cursor:pointer;">&times;</button>
   </div>
+  
+  <!-- Active filters list -->
+  <div id="active-filters-bar" style="display:none; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+  </div>
+  
   <div id="list-body"></div>
 </div>
 
@@ -330,6 +327,24 @@
   <div class="sheet" id="detail-sheet">
     <div class="sheet-handle"></div>
     <div id="detail-body"></div>
+  </div>
+</div>
+
+<!-- FILTER SHEET -->
+<div class="overlay" id="filter-overlay" onclick="closeFilterSheet(event)">
+  <div class="sheet" id="filter-sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-close" onclick="closeFilterSheetDirect()">&times;</div>
+    <h2 style="font-family:'Lora',serif;font-size:18px;margin-bottom:18px;font-weight:600;">Filter & Sort</h2>
+    
+    <div id="filter-sheet-body">
+      <!-- Generated dynamically in js -->
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px;position:sticky;bottom:0;background:var(--surface);padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn btn-secondary" onclick="resetFilters()">Reset All</button>
+      <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
+    </div>
   </div>
 </div>
 

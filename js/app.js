@@ -4,8 +4,16 @@
 const STORE_KEY = 'nivesh_diary_v2';
 let data = { investments: [], settings: { reminderDays: 30, notifEnabled: false, hideAmounts: false } };
 let editingId = null;
-let currentFilter = 'all';
-let currentSort = 'maturity';
+let filterState = {
+  search: '',
+  types: [],
+  sources: [],
+  investors: [],
+  status: [],
+  sortBy: 'maturity',
+  sortDir: 'asc'
+};
+let tempFilterState = JSON.parse(JSON.stringify(filterState));
 let deferredInstallPrompt = null;
 
 function load() {
@@ -274,24 +282,372 @@ function renderHome() {
 ═══════════════════════════════════════════ */
 function renderList() {
   let list = [...data.investments];
-  if (currentFilter !== 'all') list = list.filter(i => i.type === currentFilter);
 
-  if (currentSort === 'maturity') list.sort((a, b) => {
-    if (!a.maturity) return 1; if (!b.maturity) return -1;
-    return new Date(a.maturity) - new Date(b.maturity);
-  });
-  else if (currentSort === 'amount') list.sort((a, b) => getInvestedPrincipal(b) - getInvestedPrincipal(a));
-  else list.sort((a, b) => b.addedAt - a.addedAt);
+  // 1. Search Query filter
+  if (filterState.search.trim()) {
+    const query = filterState.search.toLowerCase().trim();
+    list = list.filter(i => {
+      const name = (i.name || '').toLowerCase();
+      const source = (i.sourceCustom || i.source || '').toLowerCase();
+      const investor = (i.investor || '').toLowerCase();
+      const accno = (i.accno || '').toLowerCase();
+      const notes = (i.notes || '').toLowerCase();
+      return name.includes(query) || source.includes(query) || investor.includes(query) || accno.includes(query) || notes.includes(query);
+    });
+  }
 
+  // 2. Type filter
+  if (filterState.types.length > 0) {
+    list = list.filter(i => filterState.types.includes(i.type));
+  }
+
+  // 3. Institution / Source filter
+  if (filterState.sources.length > 0) {
+    list = list.filter(i => {
+      const src = i.sourceCustom || i.source;
+      return filterState.sources.includes(src);
+    });
+  }
+
+  // 4. Investor filter
+  if (filterState.investors.length > 0) {
+    list = list.filter(i => {
+      const inv = i.investor || 'Self/Unspecified';
+      return filterState.investors.includes(inv);
+    });
+  }
+
+  // 5. Maturity status filter
+  if (filterState.status.length > 0) {
+    list = list.filter(i => {
+      const dl = daysLeft(i.maturity);
+      return filterState.status.some(st => {
+        if (st === 'active') return dl !== null && dl >= 0;
+        if (st === 'matured') return dl !== null && dl < 0;
+        if (st === 'soon') return dl !== null && dl >= 0 && dl <= 30;
+        return true;
+      });
+    });
+  }
+
+  // 6. Sorting
+  if (filterState.sortBy === 'maturity') {
+    list.sort((a, b) => {
+      if (!a.maturity) return 1; if (!b.maturity) return -1;
+      const diff = new Date(a.maturity) - new Date(b.maturity);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else if (filterState.sortBy === 'principal') {
+    list.sort((a, b) => {
+      const diff = getInvestedPrincipal(a) - getInvestedPrincipal(b);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else if (filterState.sortBy === 'rate') {
+    list.sort((a, b) => {
+      const diff = (a.rate || 0) - (b.rate || 0);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else if (filterState.sortBy === 'start') {
+    list.sort((a, b) => {
+      if (!a.start) return 1; if (!b.start) return -1;
+      const diff = new Date(a.start) - new Date(b.start);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else {
+    // default: added
+    list.sort((a, b) => {
+      const diff = a.addedAt - b.addedAt;
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  }
+
+  // Render to DOM
   document.getElementById('list-body').innerHTML = list.length
     ? list.map(i => invCard(i)).join('')
     : `<div class="empty-state"><div class="empty-icon">🔍</div><h3>Nothing found</h3><p>No investments match this filter.</p></div>`;
+
+  updateActiveFiltersBar();
 }
-function setFilter(el) {
-  document.querySelectorAll('.fchip').forEach(c => c.classList.remove('on'));
-  el.classList.add('on');
-  currentFilter = el.dataset.f;
+
+function onSearchInput(val) {
+  filterState.search = val;
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) {
+    clearBtn.style.display = val ? 'block' : 'none';
+  }
   renderList();
+}
+
+function clearSearch() {
+  const searchEl = document.getElementById('list-search');
+  if (searchEl) {
+    searchEl.value = '';
+  }
+  filterState.search = '';
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) {
+    clearBtn.style.display = 'none';
+  }
+  renderList();
+}
+
+function openFilterSheet() {
+  tempFilterState = JSON.parse(JSON.stringify(filterState));
+  renderFilterSheet();
+  document.getElementById('filter-overlay').classList.add('open');
+}
+
+function closeFilterSheet(event) {
+  if (event && event.target !== document.getElementById('filter-overlay')) return;
+  document.getElementById('filter-overlay').classList.remove('open');
+}
+
+function closeFilterSheetDirect() {
+  document.getElementById('filter-overlay').classList.remove('open');
+}
+
+function setTempSortDir(dir) {
+  tempFilterState.sortDir = dir;
+  renderFilterSheet();
+}
+
+function toggleTempType(type) {
+  const idx = tempFilterState.types.indexOf(type);
+  if (idx > -1) {
+    tempFilterState.types.splice(idx, 1);
+  } else {
+    tempFilterState.types.push(type);
+  }
+  renderFilterSheet();
+}
+
+function toggleTempStatus(st) {
+  const idx = tempFilterState.status.indexOf(st);
+  if (idx > -1) {
+    tempFilterState.status.splice(idx, 1);
+  } else {
+    tempFilterState.status.push(st);
+  }
+  renderFilterSheet();
+}
+
+function toggleTempSource(src) {
+  const idx = tempFilterState.sources.indexOf(src);
+  if (idx > -1) {
+    tempFilterState.sources.splice(idx, 1);
+  } else {
+    tempFilterState.sources.push(src);
+  }
+  renderFilterSheet();
+}
+
+function toggleTempInvestor(inv) {
+  const idx = tempFilterState.investors.indexOf(inv);
+  if (idx > -1) {
+    tempFilterState.investors.splice(idx, 1);
+  } else {
+    tempFilterState.investors.push(inv);
+  }
+  renderFilterSheet();
+}
+
+function resetFilters() {
+  tempFilterState = {
+    search: tempFilterState.search, // preserve search text
+    types: [],
+    sources: [],
+    investors: [],
+    status: [],
+    sortBy: 'maturity',
+    sortDir: 'asc'
+  };
+  renderFilterSheet();
+}
+
+function applyFilters() {
+  const sortByEl = document.getElementById('temp-sort-by');
+  if (sortByEl) {
+    tempFilterState.sortBy = sortByEl.value;
+  }
+  filterState = JSON.parse(JSON.stringify(tempFilterState));
+  closeFilterSheetDirect();
+  renderList();
+}
+
+function renderFilterSheet() {
+  const container = document.getElementById('filter-sheet-body');
+  if (!container) return;
+  
+  const sources = [...new Set(data.investments.map(i => i.sourceCustom || i.source).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const investors = [...new Set(data.investments.map(i => i.investor).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  
+  let html = `
+    <!-- Sort By section -->
+    <div class="filter-section">
+      <div class="filter-section-title">Sort By</div>
+      <div class="field" style="margin-bottom: 12px;">
+        <select id="temp-sort-by" style="width: 100%; border: 1.5px solid var(--border); border-radius: var(--r-sm); padding: 12px 14px; background: var(--bg); font-size: 15px; -webkit-appearance: none; appearance: none; background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A7265' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E&quot;); background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px;">
+          <option value="maturity" ${tempFilterState.sortBy === 'maturity' ? 'selected' : ''}>Maturity Date</option>
+          <option value="principal" ${tempFilterState.sortBy === 'principal' ? 'selected' : ''}>Principal Amount</option>
+          <option value="rate" ${tempFilterState.sortBy === 'rate' ? 'selected' : ''}>Interest Rate %</option>
+          <option value="start" ${tempFilterState.sortBy === 'start' ? 'selected' : ''}>Start Date</option>
+          <option value="added" ${tempFilterState.sortBy === 'added' ? 'selected' : ''}>Recently Added</option>
+        </select>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button type="button" class="btn-sm ${tempFilterState.sortDir === 'asc' ? 'on' : ''}" style="width:100%; border-radius:var(--r-sm); border:1.5px solid var(--border); background:var(--surface);" onclick="setTempSortDir('asc')">Ascending</button>
+        <button type="button" class="btn-sm ${tempFilterState.sortDir === 'desc' ? 'on' : ''}" style="width:100%; border-radius:var(--r-sm); border:1.5px solid var(--border); background:var(--surface);" onclick="setTempSortDir('desc')">Descending</button>
+      </div>
+    </div>
+    
+    <!-- Investment Types section -->
+    <div class="filter-section">
+      <div class="filter-section-title">Investment Type</div>
+      <div class="chip-grid">
+  `;
+  
+  Object.keys(SCHEME_INFO).forEach(type => {
+    const isSelected = tempFilterState.types.includes(type);
+    const label = SCHEME_INFO[type].label || type;
+    html += `<button type="button" class="chip-btn ${isSelected ? 'selected' : ''}" onclick="toggleTempType('${type}')">${label}</button>`;
+  });
+  
+  html += `
+      </div>
+    </div>
+    
+    <!-- Maturity Status section -->
+    <div class="filter-section">
+      <div class="filter-section-title">Maturity Status</div>
+      <div class="chip-grid">
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('active') ? 'selected' : ''}" onclick="toggleTempStatus('active')">Active</button>
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('matured') ? 'selected' : ''}" onclick="toggleTempStatus('matured')">Matured</button>
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('soon') ? 'selected' : ''}" onclick="toggleTempStatus('soon')">Maturing soon (≤30 days)</button>
+      </div>
+    </div>
+  `;
+  
+  if (sources.length > 0) {
+    html += `
+      <div class="filter-section">
+        <div class="filter-section-title">Institution / Bank</div>
+        <div class="chip-grid">
+    `;
+    sources.forEach(src => {
+      const isSelected = tempFilterState.sources.includes(src);
+      html += `<button type="button" class="chip-btn ${isSelected ? 'selected' : ''}" onclick="toggleTempSource(\`${src.replace(/`/g, '\\`').replace(/"/g, '&quot;')}\`)">${src}</button>`;
+    });
+    html += `
+        </div>
+      </div>
+    `;
+  }
+  
+  const hasUnspecified = data.investments.some(i => !i.investor);
+  if (investors.length > 0 || hasUnspecified) {
+    html += `
+      <div class="filter-section">
+        <div class="filter-section-title">Investor</div>
+        <div class="chip-grid">
+    `;
+    
+    const allInvestors = [...investors];
+    if (hasUnspecified) {
+      allInvestors.push('Self/Unspecified');
+    }
+    
+    allInvestors.forEach(inv => {
+      const isSelected = tempFilterState.investors.includes(inv);
+      html += `<button type="button" class="chip-btn ${isSelected ? 'selected' : ''}" onclick="toggleTempInvestor(\`${inv.replace(/`/g, '\\`').replace(/"/g, '&quot;')}\`)">${inv}</button>`;
+    });
+    html += `
+        </div>
+      </div>
+    `;
+  }
+  
+  container.innerHTML = html;
+}
+
+function updateActiveFiltersBar() {
+  const bar = document.getElementById('active-filters-bar');
+  const badge = document.getElementById('filter-badge');
+  if (!bar) return;
+  
+  let tags = [];
+  let count = 0;
+  
+  if (filterState.types.length > 0) {
+    count += filterState.types.length;
+    const labels = filterState.types.map(t => (SCHEME_INFO[t] || {}).label || t).join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('types')">Type: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.sources.length > 0) {
+    count += filterState.sources.length;
+    const labels = filterState.sources.join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('sources')">Bank: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.investors.length > 0) {
+    count += filterState.investors.length;
+    const labels = filterState.investors.join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('investors')">Investor: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.status.length > 0) {
+    count += filterState.status.length;
+    const statusLabels = { active: 'Active', matured: 'Matured', soon: 'Maturing soon' };
+    const labels = filterState.status.map(s => statusLabels[s] || s).join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('status')">Status: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.sortBy !== 'maturity' || filterState.sortDir !== 'asc') {
+    const sortFields = {
+      maturity: 'Maturity',
+      principal: 'Principal',
+      rate: 'Interest Rate',
+      start: 'Start Date',
+      added: 'Date Added'
+    };
+    const fieldLabel = sortFields[filterState.sortBy] || filterState.sortBy;
+    const dirLabel = filterState.sortDir === 'asc' ? '↑' : '↓';
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('sort')">Sort: ${fieldLabel} ${dirLabel} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (tags.length > 0) {
+    tags.push(`<button class="fchip" style="font-size:11px; padding:4px 10px; background:none; border:1.5px dashed var(--red); color:var(--red); cursor:pointer;" onclick="clearAllFilters()">Clear All</button>`);
+    bar.innerHTML = tags.join('');
+    bar.style.display = 'flex';
+  } else {
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+  }
+  
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
+}
+
+function clearFilterCategory(cat) {
+  if (cat === 'sort') {
+    filterState.sortBy = 'maturity';
+    filterState.sortDir = 'asc';
+  } else {
+    filterState[cat] = [];
+  }
+  renderList();
+}
+
+function clearAllFilters() {
+  filterState.types = [];
+  filterState.sources = [];
+  filterState.investors = [];
+  filterState.status = [];
+  filterState.sortBy = 'maturity';
+  filterState.sortDir = 'asc';
+  clearSearch();
 }
 
 /* ════════════════════════════════════════
