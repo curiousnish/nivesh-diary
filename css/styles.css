@@ -102,6 +102,13 @@ input, select, textarea, button { font-family: inherit; }
   height: 20px;
   object-fit: contain;
   display: block;
+  /* Match --muted color (#7A7265) for inactive tabs */
+  filter: brightness(0) saturate(100%) invert(46%) sepia(16%) saturate(313%) hue-rotate(0deg) brightness(94%) contrast(92%);
+  transition: filter 0.15s;
+}
+.tab.active .tab-icon img {
+  /* Match --accent color (#2C5F2E) for active tabs */
+  filter: brightness(0) saturate(100%) invert(29%) sepia(41%) saturate(558%) hue-rotate(73deg) brightness(98%) contrast(97%);
 }
 .tab-badge {
   position: absolute; top: 5px; right: calc(50% - 18px);
