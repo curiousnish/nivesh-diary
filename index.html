@@ -332,16 +332,16 @@
 
 <!-- FILTER SHEET -->
 <div class="overlay" id="filter-overlay" onclick="closeFilterSheet(event)">
-  <div class="sheet" id="filter-sheet" onclick="event.stopPropagation()">
+  <div class="sheet sheet-flex" id="filter-sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
     <div class="sheet-close" onclick="closeFilterSheetDirect()">&times;</div>
-    <h2 style="font-family:'Lora',serif;font-size:18px;margin-bottom:18px;font-weight:600;">Filter & Sort</h2>
+    <h2 style="font-family:'Lora',serif;font-size:18px;margin-bottom:18px;font-weight:600;padding:0 20px;">Filter & Sort</h2>
     
-    <div id="filter-sheet-body">
+    <div class="sheet-body" id="filter-sheet-body">
       <!-- Generated dynamically in js -->
     </div>
     
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px;position:sticky;bottom:0;background:var(--surface);padding-top:12px;border-top:1px solid var(--border)">
+    <div class="sheet-footer">
       <button class="btn btn-secondary" onclick="resetFilters()">Reset All</button>
       <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
     </div>
@@ -356,7 +356,7 @@
     <div class="field">
       <input type="password" id="pwd-input" placeholder="Password">
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;">
+    <div class="field-row" style="margin-top:20px;">
       <button class="btn btn-secondary" onclick="closePasswordModal()">Cancel</button>
       <button class="btn btn-primary" id="pwd-confirm-btn">Confirm</button>
     </div>

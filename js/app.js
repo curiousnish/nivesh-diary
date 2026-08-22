@@ -1074,12 +1074,12 @@ function openDetail(id) {
     </div>
     <div class="detail-actions">
       ${!isClosed ? `
-        <button class="btn btn-primary" onclick="settleInvestment('${inv.id}')">✅ Mark as Settled / Closed</button>
+        <button class="btn btn-primary" onclick="settleInvestment('${inv.id}')">✅ Settle / Close</button>
         ${dl !== null && dl <= 0 ? `
-          <button class="btn" style="background:#0b8478; color:white; border:none;" onclick="rolloverInvestment('${inv.id}')">🔄 Reinvest / Roll Over</button>
+          <button class="btn" style="background:#0b8478; color:white; border-color:#0b8478;" onclick="rolloverInvestment('${inv.id}')">🔄 Roll Over</button>
         ` : ''}
       ` : `
-        <button class="btn btn-primary" onclick="reopenInvestment('${inv.id}')">🔓 Reopen Investment</button>
+        <button class="btn btn-primary" onclick="reopenInvestment('${inv.id}')">🔓 Reopen</button>
       `}
       <button class="btn btn-outline" onclick="editInvestment('${inv.id}')">✏️ Edit</button>
       <button class="btn btn-danger" onclick="deleteInvestment('${inv.id}')">🗑️ Delete</button>
