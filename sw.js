@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nivesh-diary-v15';
+const CACHE_NAME = 'nivesh-diary-v16';
 const ASSETS = [
   './',
   './index.html',
@@ -14,7 +14,8 @@ const ASSETS = [
   './assets/gear_settings_wheel_icon.png',
   './assets/home_icon.png',
   './assets/notifications_active_icon.png',
-  './assets/plus_add_insert_icon.png'
+  './assets/plus_add_insert_icon.png',
+  './assets/renew_investment_icon.png'
 ];
 
 self.addEventListener('install', e => {

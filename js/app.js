@@ -1076,7 +1076,7 @@ function openDetail(id) {
       ${!isClosed ? `
         <button class="btn btn-primary" onclick="settleInvestment('${inv.id}')">✅ Settle / Close</button>
         ${dl !== null && dl <= 0 ? `
-          <button class="btn" style="background:#0b8478; color:white; border-color:#0b8478;" onclick="rolloverInvestment('${inv.id}')">🔄 Roll Over</button>
+          <button class="btn" style="background:#0b8478; color:white; border-color:#0b8478;" onclick="rolloverInvestment('${inv.id}')"><img src="assets/renew_investment_icon.png" alt="" style="width:20px; height:20px; margin-right:8px; object-fit:contain; filter:brightness(0) invert(1);">Roll Over</button>
         ` : ''}
       ` : `
         <button class="btn btn-primary" onclick="reopenInvestment('${inv.id}')">🔓 Reopen</button>
@@ -1173,7 +1173,7 @@ function rolloverInvestment(id) {
   
   document.getElementById('detail-overlay').classList.remove('open');
   editingId = null;
-  document.getElementById('form-heading').textContent = '🔄 Roll Over Investment';
+  document.getElementById('form-heading').innerHTML = `<img src="assets/renew_investment_icon.png" alt="" style="width:20px; height:20px; vertical-align:middle; margin-right:6px; filter:brightness(0) saturate(100%) invert(29%) sepia(41%) saturate(558%) hue-rotate(73deg) brightness(98%) contrast(97%);"> Roll Over Investment`;
   document.getElementById('save-btn').textContent = 'Save Roll Over';
   clearForm();
   
