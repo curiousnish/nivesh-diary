@@ -1,4 +1,4 @@
-package com.niveshdiary.app;
+package com.curiousnish.niveshdiary;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -10,7 +10,7 @@ To convert the web PWA to a native Android wrapper without changing any existing
 
 1. **Created Project Configurations:**
    * [`package.json`](file:///Users/nish/Code/nivesh-diary/package.json): Defines Capacitor core dependencies, native Android plugins, and a `build` script to bundle assets.
-   * [`capacitor.config.json`](file:///Users/nish/Code/nivesh-diary/capacitor.config.json): Specifies the app's metadata (`com.niveshdiary.app`), display name (`Nivesh Diary`), and local resource folder (`www`).
+   * [`capacitor.config.json`](file:///Users/nish/Code/nivesh-diary/capacitor.config.json): Specifies the app's metadata (`com.curiousnish.niveshdiary`), display name (`Nivesh Diary`), and local resource folder (`www`).
 
 2. **Added Android Platform Wrapper:**
    * Initialized the native project using `npx cap add android` (resides in the [`android/`](file:///Users/nish/Code/nivesh-diary/android) folder).
