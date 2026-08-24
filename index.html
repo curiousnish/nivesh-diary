@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Nivesh Diary">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
 <title>Nivesh Diary</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
@@ -19,19 +20,16 @@
 <!-- TOP NAV -->
 <nav class="topnav">
   <div class="brand">
-    <div class="brand-logo">📒</div>
+    <div class="brand-logo"><img src="icons/icon-192.png" alt="Nivesh Diary Logo"></div>
     <div class="brand-text">
       <div class="brand-name">Nivesh Diary</div>
       <div class="brand-sub">Investment Record Book</div>
     </div>
   </div>
   <div class="nav-actions">
-    <div class="icon-btn" id="hide-toggle-btn" onclick="toggleHideAmounts()" title="Toggle Visibility">👁️</div>
-    <div class="notif-badge-wrap">
-      <div class="icon-btn" onclick="showPage('alerts')" title="Alerts">🔔</div>
-      <div class="notif-dot" id="notif-dot"></div>
+    <div class="icon-btn" id="hide-toggle-btn" onclick="toggleHideAmounts()" title="Toggle Visibility">
+      <img src="assets/visible_eye_icon.png" alt="Toggle Visibility">
     </div>
-    <div class="icon-btn" onclick="openSheet('backup-sheet')" title="Backup">⚙️</div>
   </div>
 </nav>
 
@@ -42,7 +40,6 @@
 
   <!-- Install banner (shown when PWA can be installed) -->
   <div class="install-banner" id="install-banner" onclick="installPWA()">
-    <span style="font-size:28px">📲</span>
     <div>
       <strong>Add to Home Screen</strong>
       <p>Install this app for quick access and notifications</p>
@@ -51,7 +48,6 @@
 
   <!-- Notification permission prompt -->
   <div class="notif-prompt" id="notif-prompt">
-    <span style="font-size:22px">🔔</span>
     <div style="flex:1">
       <div style="font-size:13px;font-weight:600;margin-bottom:4px">Enable maturity reminders</div>
       <div style="font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:10px">Get notified before your investments mature, even when the app is closed.</div>
@@ -82,27 +78,24 @@
 <!-- PAGE: MY INVESTMENTS               -->
 <!-- ═══════════════════════════════════ -->
 <div class="page" id="page-list">
-  <div class="filters" id="list-filters">
-    <button class="fchip on" data-f="all"  onclick="setFilter(this)">All</button>
-    <button class="fchip"    data-f="FD"   onclick="setFilter(this)">Fixed Deposit</button>
-    <button class="fchip"    data-f="RD"   onclick="setFilter(this)">Recurring Dep.</button>
-    <button class="fchip"    data-f="TD"   onclick="setFilter(this)">Term Deposit</button>
-    <button class="fchip"    data-f="NSC"  onclick="setFilter(this)">NSC</button>
-    <button class="fchip"    data-f="KVP"  onclick="setFilter(this)">KVP</button>
-    <button class="fchip"    data-f="MIS"  onclick="setFilter(this)">MIS</button>
-    <button class="fchip"    data-f="PPF"  onclick="setFilter(this)">PPF</button>
-    <button class="fchip"    data-f="SCSS" onclick="setFilter(this)">SCSS</button>
-    <button class="fchip"    data-f="Bond" onclick="setFilter(this)">Bond</button>
-    <button class="fchip"    data-f="Other" onclick="setFilter(this)">Other</button>
+  <div class="list-header-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="font-family:'Lora',serif; font-size:16px; font-weight:600; color:var(--text);">My Investments</h2>
+    <button class="btn-sm" onclick="openFilterSheet()" style="display:flex; align-items:center; gap:6px;">
+      Filter & Sort
+      <span id="filter-badge" style="display:none; background:var(--accent); color:white; font-size:10px; font-weight:bold; min-width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center;">0</span>
+    </button>
   </div>
-  <div class="sort-bar">
-    <label>Sort by</label>
-    <select onchange="currentSort=this.value; renderList()">
-      <option value="maturity">Maturity date</option>
-      <option value="amount">Amount (high-low)</option>
-      <option value="added">Recently added</option>
-    </select>
+  
+  <!-- Search Input Field -->
+  <div class="field" style="margin-bottom: 12px; position: relative;">
+    <input type="text" id="list-search" placeholder="Search name, bank, investor, notes..." oninput="onSearchInput(this.value)" style="padding-right: 36px;">
+    <button id="search-clear-btn" onclick="clearSearch()" style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; font-size:16px; color:var(--muted); cursor:pointer;">&times;</button>
   </div>
+  
+  <!-- Active filters list -->
+  <div id="active-filters-bar" style="display:none; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+  </div>
+  
   <div id="list-body"></div>
 </div>
 
@@ -111,7 +104,7 @@
 <!-- ═══════════════════════════════════ -->
 <div class="page" id="page-add">
   <div class="form-wrap">
-    <div class="form-heading" id="form-heading">📝 Add New Investment</div>
+    <div class="form-heading" id="form-heading">Add New Investment</div>
 
     <div class="field">
       <label>Investment type *</label>
@@ -269,25 +262,59 @@
 
   <div class="sec-head" style="margin-top:24px">Send Summary</div>
   <div style="display:grid;gap:10px">
-    <button class="btn btn-whatsapp" onclick="shareWhatsApp()">📲 Share via WhatsApp</button>
-    <button class="btn btn-email"    onclick="shareEmail()">📧 Send Email Summary</button>
+    <button class="btn btn-whatsapp" onclick="shareWhatsApp()">Share via WhatsApp</button>
+    <button class="btn btn-email"    onclick="shareEmail()">Send Email Summary</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- PAGE: SETTINGS                      -->
+<!-- ═══════════════════════════════════ -->
+<div class="page" id="page-settings">
+  <div class="sec-head">Backup &amp; Settings</div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6">Keep a copy of your investment data safe. Backup regularly and store in Google Drive or WhatsApp.</p>
+
+  <div class="setting-row">
+    <div><div class="s-label">Export data (JSON)</div><div class="s-desc">Download all investments to your phone</div></div>
+    <button class="btn-sm" onclick="exportData()" style="background:var(--accent);color:white;border-color:var(--accent)">Export</button>
+  </div>
+  <div class="setting-row">
+    <div><div class="s-label">Import data (JSON)</div><div class="s-desc">Restore from a backup file</div></div>
+    <button class="btn-sm" onclick="document.getElementById('import-input').click()">Import</button>
+  </div>
+  <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+
+  <div class="setting-row">
+    <div><div class="s-label">Notifications</div><div class="s-desc" id="notif-status-text">Tap to enable maturity reminders</div></div>
+    <button class="btn-sm" id="notif-toggle-btn" onclick="toggleNotifications()">Enable</button>
+  </div>
+
+  <hr>
+  <div class="setting-row" style="border:none">
+    <div><div class="s-label" style="color:var(--red)">Delete all data</div><div class="s-desc">Permanently remove all investments</div></div>
+    <button class="btn-sm" style="color:var(--red);border-color:#FECACA" onclick="confirmDeleteAll()">Delete</button>
   </div>
 </div>
 
 <!-- BOTTOM TABS -->
 <div class="tabs">
   <button class="tab active" id="tab-home"   onclick="showPage('home')">
-    <span class="tab-icon">🏠</span>Dashboard
+    <span class="tab-icon"><img src="assets/home_icon.png" alt="Dashboard"></span>Dashboard
   </button>
   <button class="tab" id="tab-list"   onclick="showPage('list')">
-    <span class="tab-icon">📋</span>Investments
+    <span class="tab-icon"><img src="assets/dashboard_icon.png" alt="Investments"></span>Investments
   </button>
   <button class="tab" id="tab-add"    onclick="newInvestment()">
-    <span class="tab-icon">➕</span>Add New
+    <span class="tab-icon"><img src="assets/plus_add_insert_icon.png" alt="Add New"></span>Add New
   </button>
   <button class="tab" id="tab-alerts" onclick="showPage('alerts')">
-    <span class="tab-icon">🔔</span>Alerts
-    <span class="tab-badge" id="alert-badge" style="display:none">0</span>
+    <span class="tab-icon">
+      <img src="assets/notifications_active_icon.png" alt="Alerts">
+      <div class="notif-dot" id="notif-dot"></div>
+    </span>Alerts
+  </button>
+  <button class="tab" id="tab-settings" onclick="showPage('settings')">
+    <span class="tab-icon"><img src="assets/gear_settings_wheel_icon.png" alt="Settings"></span>Settings
   </button>
 </div>
 
@@ -301,34 +328,20 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════ -->
-<!-- BACKUP SHEET                       -->
-<!-- ═══════════════════════════════════ -->
-<div class="overlay" id="backup-overlay" onclick="closeSheet(event,'backup-overlay')">
-  <div class="sheet">
+<!-- FILTER SHEET -->
+<div class="overlay" id="filter-overlay" onclick="closeFilterSheet(event)">
+  <div class="sheet sheet-flex" id="filter-sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
-    <h2 style="font-family:'Lora',serif;font-size:18px;margin-bottom:6px">Backup &amp; Settings</h2>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6">Keep a copy of your investment data safe. Backup regularly and store in Google Drive or WhatsApp.</p>
-
-    <div class="setting-row">
-      <div><div class="s-label">Export data (JSON)</div><div class="s-desc">Download all investments to your phone</div></div>
-      <button class="btn-sm" onclick="exportData()" style="background:var(--accent);color:white;border-color:var(--accent)">Export</button>
+    <div class="sheet-close" onclick="closeFilterSheetDirect()">&times;</div>
+    <h2 style="font-family:'Lora',serif;font-size:18px;margin-bottom:18px;font-weight:600;padding:0 20px;">Filter & Sort</h2>
+    
+    <div class="sheet-body" id="filter-sheet-body">
+      <!-- Generated dynamically in js -->
     </div>
-    <div class="setting-row">
-      <div><div class="s-label">Import data (JSON)</div><div class="s-desc">Restore from a backup file</div></div>
-      <button class="btn-sm" onclick="document.getElementById('import-input').click()">Import</button>
-    </div>
-    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
-
-    <div class="setting-row">
-      <div><div class="s-label">Notifications</div><div class="s-desc" id="notif-status-text">Tap to enable maturity reminders</div></div>
-      <button class="btn-sm" id="notif-toggle-btn" onclick="toggleNotifications()">Enable</button>
-    </div>
-
-    <hr>
-    <div class="setting-row" style="border:none">
-      <div><div class="s-label" style="color:var(--red)">Delete all data</div><div class="s-desc">Permanently remove all investments</div></div>
-      <button class="btn-sm" style="color:var(--red);border-color:#FECACA" onclick="confirmDeleteAll()">Delete</button>
+    
+    <div class="sheet-footer">
+      <button class="btn btn-secondary" onclick="resetFilters()">Reset All</button>
+      <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
     </div>
   </div>
 </div>
@@ -341,7 +354,7 @@
     <div class="field">
       <input type="password" id="pwd-input" placeholder="Password">
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;">
+    <div class="field-row" style="margin-top:20px;">
       <button class="btn btn-secondary" onclick="closePasswordModal()">Cancel</button>
       <button class="btn btn-primary" id="pwd-confirm-btn">Confirm</button>
     </div>

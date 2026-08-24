@@ -4,8 +4,17 @@
 const STORE_KEY = 'nivesh_diary_v2';
 let data = { investments: [], settings: { reminderDays: 30, notifEnabled: false, hideAmounts: false } };
 let editingId = null;
-let currentFilter = 'all';
-let currentSort = 'maturity';
+let rolloverFromId = null;
+let filterState = {
+  search: '',
+  types: [],
+  sources: [],
+  investors: [],
+  status: [],
+  sortBy: 'maturity',
+  sortDir: 'asc'
+};
+let tempFilterState = JSON.parse(JSON.stringify(filterState));
 let deferredInstallPrompt = null;
 
 function load() {
@@ -50,9 +59,10 @@ function showPage(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'home')   renderHome();
-  if (name === 'list')   renderList();
-  if (name === 'alerts') renderAlerts();
+  if (name === 'home')     renderHome();
+  if (name === 'list')     renderList();
+  if (name === 'alerts')   renderAlerts();
+  if (name === 'settings') updateNotifUI();
 }
 
 /* ════════════════════════════════════════
@@ -87,8 +97,9 @@ function toggleHideAmounts() {
 function updateHideUI() {
   const btn = document.getElementById('hide-toggle-btn');
   if (btn) {
-    btn.textContent = data.settings.hideAmounts ? '🔒' : '👁️';
-    btn.title = data.settings.hideAmounts ? 'Show Amounts' : 'Hide Amounts';
+    const isHidden = data.settings.hideAmounts;
+    btn.innerHTML = `<img src="${isHidden ? 'assets/eye_closed_icon.png' : 'assets/visible_eye_icon.png'}" alt="Visibility Status">`;
+    btn.title = isHidden ? 'Show Amounts' : 'Hide Amounts';
   }
 }
 function fmtDate(d) {
@@ -129,30 +140,101 @@ function addMonths(dateStr, months) {
   return d.toISOString().split('T')[0];
 }
 
+function getRdPaidMonths(startStr, maturityStr) {
+  if (!startStr || !maturityStr) return 0;
+  const start = new Date(startStr);
+  const maturity = new Date(maturityStr);
+  const now = new Date();
+  
+  start.setHours(0,0,0,0);
+  maturity.setHours(0,0,0,0);
+  now.setHours(0,0,0,0);
+
+  if (now < start) return 0;
+  
+  const totalMonths = (maturity.getFullYear() - start.getFullYear()) * 12 + (maturity.getMonth() - start.getMonth());
+  
+  if (now >= maturity) {
+    return Math.max(1, totalMonths);
+  }
+
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (now.getDate() >= start.getDate()) {
+    months += 1;
+  }
+  
+  return Math.min(Math.max(1, months), Math.max(1, totalMonths));
+}
+
+function getInvestedPrincipal(inv) {
+  if (inv.type === 'RD') {
+    const start = new Date(inv.start);
+    const maturity = new Date(inv.maturity);
+    const totalMonths = (maturity.getFullYear() - start.getFullYear()) * 12 + (maturity.getMonth() - start.getMonth());
+    const monthly = Number(inv.monthly) || (totalMonths > 0 ? (Number(inv.principal || 0) / totalMonths) : 0);
+    if (monthly > 0) {
+      const paidMonths = getRdPaidMonths(inv.start, inv.maturity);
+      return Math.round(paidMonths * monthly);
+    }
+  }
+  return Number(inv.principal || 0);
+}
+
+function getRdProgress(inv) {
+  if (inv.type !== 'RD') return '';
+  const start = new Date(inv.start);
+  const maturity = new Date(inv.maturity);
+  const totalMonths = (maturity.getFullYear() - start.getFullYear()) * 12 + (maturity.getMonth() - start.getMonth());
+  const paidMonths = getRdPaidMonths(inv.start, inv.maturity);
+  return `${paidMonths}/${totalMonths} mos`;
+}
+
 /* ════════════════════════════════════════
    RENDER HOME
 ═══════════════════════════════════════════ */
 function renderHome() {
   const invs = data.investments;
-  const total = invs.reduce((s, i) => s + Number(i.principal || 0), 0);
-  const upcoming = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; });
-  const urgent   = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; });
+  const activeInvs = invs.filter(i => i.status !== 'closed');
+  
+  // Invested Portfolio: Active running (maturity date is in the future or today)
+  const activeRunningInvs = activeInvs.filter(i => {
+    const d = daysLeft(i.maturity);
+    return d !== null && d >= 0;
+  });
+
+  // Matured Portfolio: Active but matured (maturity date in the past, status not closed)
+  const maturedUnclosedInvs = activeInvs.filter(i => {
+    const d = daysLeft(i.maturity);
+    return d !== null && d < 0;
+  });
+
+  const investedVal = activeRunningInvs.reduce((s, i) => s + getInvestedPrincipal(i), 0);
+  const maturedVal = maturedUnclosedInvs.reduce((s, i) => s + Number(i.matamt || i.principal || 0), 0);
+  const totalVal = investedVal + maturedVal;
+
+  const upcoming = activeInvs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; });
+  const urgent   = activeInvs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; });
 
   document.getElementById('home-stats').innerHTML = `
     <div class="stat-card">
-      <div class="stat-lbl">Total Invested</div>
-      <div class="stat-val green">${fmt(total)}</div>
-      <div class="stat-sub">${invs.length} investment${invs.length !== 1 ? 's' : ''}</div>
+      <div class="stat-lbl">Invested Portfolio</div>
+      <div class="stat-val green">${fmt(investedVal)}</div>
+      <div class="stat-sub">${activeRunningInvs.length} active investment${activeRunningInvs.length !== 1 ? 's' : ''}</div>
     </div>
     <div class="stat-card">
+      <div class="stat-lbl">Total Portfolio</div>
+      <div class="stat-val green">${fmt(totalVal)}</div>
+      <div class="stat-sub">${activeInvs.length} current investment${activeInvs.length !== 1 ? 's' : ''}${maturedUnclosedInvs.length ? ` (${maturedUnclosedInvs.length} matured)` : ''}</div>
+    </div>
+    <div class="stat-card wide">
       <div class="stat-lbl">Maturing in 90 days</div>
       <div class="stat-val ${urgent.length ? 'red' : 'amber'}">${upcoming.length}</div>
       <div class="stat-sub">${urgent.length} urgent (≤30 days)</div>
     </div>
     <div class="stat-card wide">
-      <div class="stat-lbl">Expected maturity value (of tracked)</div>
-      <div class="stat-val green">${fmt(invs.reduce((s,i) => s + Number(i.matamt || i.principal || 0), 0))}</div>
-      <div class="stat-sub">across ${invs.filter(i=>i.matamt).length} investments with known returns</div>
+      <div class="stat-lbl">Expected maturity value (of current portfolio)</div>
+      <div class="stat-val green">${fmt(activeInvs.reduce((s,i) => s + Number(i.matamt || i.principal || 0), 0))}</div>
+      <div class="stat-sub">across ${activeInvs.filter(i=>i.matamt).length} investments with known returns</div>
     </div>
   `;
 
@@ -160,30 +242,26 @@ function renderHome() {
   let alerts = '';
   if (urgent.length) {
     alerts += `<div class="alert-banner red">
-      <div class="alert-icon">🚨</div>
       <div class="alert-body">
         <div class="alert-title">${urgent.length} investment${urgent.length>1?'s':''} maturing within 30 days!</div>
         <div class="alert-desc">${urgent.map(i => `${i.name} (${fmtDate(i.maturity)})`).join(', ')}. Visit Alerts tab to take action.</div>
       </div>
     </div>`;
   }
-  const soon60 = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; });
+  const soon60 = activeInvs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; });
   if (soon60.length) {
     alerts += `<div class="alert-banner amber">
-      <div class="alert-icon">⚠️</div>
       <div class="alert-body">
         <div class="alert-title">${soon60.length} maturing in 31–60 days</div>
         <div class="alert-desc">${soon60.map(i => i.name).join(', ')}</div>
       </div>
     </div>`;
   }
-  const matured = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; });
-  if (matured.length) {
+  if (maturedUnclosedInvs.length) {
     alerts += `<div class="alert-banner green">
-      <div class="alert-icon">✅</div>
       <div class="alert-body">
-        <div class="alert-title">${matured.length} investment${matured.length>1?'s':''} already matured</div>
-        <div class="alert-desc">Please update or archive: ${matured.map(i=>i.name).join(', ')}</div>
+        <div class="alert-title">${maturedUnclosedInvs.length} investment${maturedUnclosedInvs.length>1?'s':''} already matured</div>
+        <div class="alert-desc">Please update, reinvest, or mark as settled: ${maturedUnclosedInvs.map(i=>i.name).join(', ')}</div>
       </div>
     </div>`;
   }
@@ -197,10 +275,10 @@ function renderHome() {
   const sorted = [...upcoming].sort((a, b) => new Date(a.maturity) - new Date(b.maturity));
   document.getElementById('home-upcoming').innerHTML = sorted.length
     ? sorted.map(i => invCard(i)).join('')
-    : `<div style="padding:16px;text-align:center;color:var(--muted);font-size:14px">No maturities in the next 90 days 🎉</div>`;
+    : `<div style="padding:16px;text-align:center;color:var(--muted);font-size:14px">No maturities in the next 90 days</div>`;
 
-  // Recent (last 4)
-  const recent = [...invs].sort((a,b) => b.addedAt - a.addedAt).slice(0, 4);
+  // Recent (last 4 active)
+  const recent = [...activeInvs].sort((a,b) => b.addedAt - a.addedAt).slice(0, 4);
   document.getElementById('home-recent').innerHTML = recent.length
     ? recent.map(i => invCard(i)).join('')
     : `<div class="empty-state"><div class="empty-icon">📒</div><h3>Nothing here yet</h3><p>Tap <strong>Add New</strong> to record your first investment.</p></div>`;
@@ -208,9 +286,14 @@ function renderHome() {
   // Update badge
   const badgeCount = urgent.length + soon60.length;
   const badge = document.getElementById('alert-badge');
-  badge.textContent = badgeCount;
-  badge.style.display = badgeCount ? 'flex' : 'none';
-  document.getElementById('notif-dot').classList.toggle('show', badgeCount > 0);
+  if (badge) {
+    badge.textContent = badgeCount;
+    badge.style.display = badgeCount ? 'flex' : 'none';
+  }
+  const notifDot = document.getElementById('notif-dot');
+  if (notifDot) {
+    notifDot.classList.toggle('show', badgeCount > 0);
+  }
 }
 
 /* ════════════════════════════════════════
@@ -218,24 +301,378 @@ function renderHome() {
 ═══════════════════════════════════════════ */
 function renderList() {
   let list = [...data.investments];
-  if (currentFilter !== 'all') list = list.filter(i => i.type === currentFilter);
 
-  if (currentSort === 'maturity') list.sort((a, b) => {
-    if (!a.maturity) return 1; if (!b.maturity) return -1;
-    return new Date(a.maturity) - new Date(b.maturity);
-  });
-  else if (currentSort === 'amount') list.sort((a, b) => Number(b.principal) - Number(a.principal));
-  else list.sort((a, b) => b.addedAt - a.addedAt);
+  // 1. Search Query filter
+  if (filterState.search.trim()) {
+    const query = filterState.search.toLowerCase().trim();
+    list = list.filter(i => {
+      const name = (i.name || '').toLowerCase();
+      const source = (i.sourceCustom || i.source || '').toLowerCase();
+      const investor = (i.investor || '').toLowerCase();
+      const accno = (i.accno || '').toLowerCase();
+      const notes = (i.notes || '').toLowerCase();
+      return name.includes(query) || source.includes(query) || investor.includes(query) || accno.includes(query) || notes.includes(query);
+    });
+  }
 
+  // 2. Type filter
+  if (filterState.types.length > 0) {
+    list = list.filter(i => filterState.types.includes(i.type));
+  }
+
+  // 3. Institution / Source filter
+  if (filterState.sources.length > 0) {
+    list = list.filter(i => {
+      const src = i.sourceCustom || i.source;
+      return filterState.sources.includes(src);
+    });
+  }
+
+  // 4. Investor filter
+  if (filterState.investors.length > 0) {
+    list = list.filter(i => {
+      const inv = i.investor || 'Self/Unspecified';
+      return filterState.investors.includes(inv);
+    });
+  }
+
+  // 5. Maturity status filter
+  if (filterState.status.length > 0) {
+    list = list.filter(i => {
+      const dl = daysLeft(i.maturity);
+      const isClosed = i.status === 'closed';
+      return filterState.status.some(st => {
+        if (st === 'active') return !isClosed && dl !== null && dl >= 0;
+        if (st === 'matured') return !isClosed && dl !== null && dl < 0;
+        if (st === 'soon') return !isClosed && dl !== null && dl >= 0 && dl <= 30;
+        if (st === 'closed') return isClosed;
+        return false;
+      });
+    });
+  } else {
+    // By default, hide closed/settled investments from the main portfolio list
+    list = list.filter(i => i.status !== 'closed');
+  }
+
+  // 6. Sorting
+  if (filterState.sortBy === 'maturity') {
+    list.sort((a, b) => {
+      if (!a.maturity) return 1; if (!b.maturity) return -1;
+      const diff = new Date(a.maturity) - new Date(b.maturity);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else if (filterState.sortBy === 'principal') {
+    list.sort((a, b) => {
+      const diff = getInvestedPrincipal(a) - getInvestedPrincipal(b);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else if (filterState.sortBy === 'rate') {
+    list.sort((a, b) => {
+      const diff = (a.rate || 0) - (b.rate || 0);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else if (filterState.sortBy === 'start') {
+    list.sort((a, b) => {
+      if (!a.start) return 1; if (!b.start) return -1;
+      const diff = new Date(a.start) - new Date(b.start);
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  } else {
+    // default: added
+    list.sort((a, b) => {
+      const diff = a.addedAt - b.addedAt;
+      return filterState.sortDir === 'asc' ? diff : -diff;
+    });
+  }
+
+  // Render to DOM
   document.getElementById('list-body').innerHTML = list.length
     ? list.map(i => invCard(i)).join('')
     : `<div class="empty-state"><div class="empty-icon">🔍</div><h3>Nothing found</h3><p>No investments match this filter.</p></div>`;
+
+  updateActiveFiltersBar();
 }
-function setFilter(el) {
-  document.querySelectorAll('.fchip').forEach(c => c.classList.remove('on'));
-  el.classList.add('on');
-  currentFilter = el.dataset.f;
+
+function onSearchInput(val) {
+  filterState.search = val;
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) {
+    clearBtn.style.display = val ? 'block' : 'none';
+  }
   renderList();
+}
+
+function clearSearch() {
+  const searchEl = document.getElementById('list-search');
+  if (searchEl) {
+    searchEl.value = '';
+  }
+  filterState.search = '';
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) {
+    clearBtn.style.display = 'none';
+  }
+  renderList();
+}
+
+function openFilterSheet() {
+  tempFilterState = JSON.parse(JSON.stringify(filterState));
+  renderFilterSheet();
+  document.getElementById('filter-overlay').classList.add('open');
+}
+
+function closeFilterSheet(event) {
+  if (event && event.target !== document.getElementById('filter-overlay')) return;
+  document.getElementById('filter-overlay').classList.remove('open');
+}
+
+function closeFilterSheetDirect() {
+  document.getElementById('filter-overlay').classList.remove('open');
+}
+
+function setTempSortDir(dir) {
+  tempFilterState.sortDir = dir;
+  renderFilterSheet();
+}
+
+function toggleTempType(type) {
+  const idx = tempFilterState.types.indexOf(type);
+  if (idx > -1) {
+    tempFilterState.types.splice(idx, 1);
+  } else {
+    tempFilterState.types.push(type);
+  }
+  renderFilterSheet();
+}
+
+function toggleTempStatus(st) {
+  const idx = tempFilterState.status.indexOf(st);
+  if (idx > -1) {
+    tempFilterState.status.splice(idx, 1);
+  } else {
+    tempFilterState.status.push(st);
+  }
+  renderFilterSheet();
+}
+
+function toggleTempSource(src) {
+  const idx = tempFilterState.sources.indexOf(src);
+  if (idx > -1) {
+    tempFilterState.sources.splice(idx, 1);
+  } else {
+    tempFilterState.sources.push(src);
+  }
+  renderFilterSheet();
+}
+
+function toggleTempInvestor(inv) {
+  const idx = tempFilterState.investors.indexOf(inv);
+  if (idx > -1) {
+    tempFilterState.investors.splice(idx, 1);
+  } else {
+    tempFilterState.investors.push(inv);
+  }
+  renderFilterSheet();
+}
+
+function resetFilters() {
+  tempFilterState = {
+    search: tempFilterState.search, // preserve search text
+    types: [],
+    sources: [],
+    investors: [],
+    status: [],
+    sortBy: 'maturity',
+    sortDir: 'asc'
+  };
+  renderFilterSheet();
+}
+
+function applyFilters() {
+  const sortByEl = document.getElementById('temp-sort-by');
+  if (sortByEl) {
+    tempFilterState.sortBy = sortByEl.value;
+  }
+  filterState = JSON.parse(JSON.stringify(tempFilterState));
+  closeFilterSheetDirect();
+  renderList();
+}
+
+function renderFilterSheet() {
+  const container = document.getElementById('filter-sheet-body');
+  if (!container) return;
+  
+  const sources = [...new Set(data.investments.map(i => i.sourceCustom || i.source).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const investors = [...new Set(data.investments.map(i => i.investor).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  
+  let html = `
+    <!-- Sort By section -->
+    <div class="filter-section">
+      <div class="filter-section-title">Sort By</div>
+      <div class="field" style="margin-bottom: 12px;">
+        <select id="temp-sort-by" style="width: 100%; border: 1.5px solid var(--border); border-radius: var(--r-sm); padding: 12px 14px; background: var(--bg); font-size: 15px; -webkit-appearance: none; appearance: none; background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A7265' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E&quot;); background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px;">
+          <option value="maturity" ${tempFilterState.sortBy === 'maturity' ? 'selected' : ''}>Maturity Date</option>
+          <option value="principal" ${tempFilterState.sortBy === 'principal' ? 'selected' : ''}>Principal Amount</option>
+          <option value="rate" ${tempFilterState.sortBy === 'rate' ? 'selected' : ''}>Interest Rate %</option>
+          <option value="start" ${tempFilterState.sortBy === 'start' ? 'selected' : ''}>Start Date</option>
+          <option value="added" ${tempFilterState.sortBy === 'added' ? 'selected' : ''}>Recently Added</option>
+        </select>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button type="button" class="btn-sm ${tempFilterState.sortDir === 'asc' ? 'on' : ''}" style="width:100%; border-radius:var(--r-sm); border:1.5px solid var(--border); background:var(--surface);" onclick="setTempSortDir('asc')">Ascending</button>
+        <button type="button" class="btn-sm ${tempFilterState.sortDir === 'desc' ? 'on' : ''}" style="width:100%; border-radius:var(--r-sm); border:1.5px solid var(--border); background:var(--surface);" onclick="setTempSortDir('desc')">Descending</button>
+      </div>
+    </div>
+    
+    <!-- Investment Types section -->
+    <div class="filter-section">
+      <div class="filter-section-title">Investment Type</div>
+      <div class="chip-grid">
+  `;
+  
+  Object.keys(SCHEME_INFO).forEach(type => {
+    const isSelected = tempFilterState.types.includes(type);
+    const label = SCHEME_INFO[type].label || type;
+    html += `<button type="button" class="chip-btn ${isSelected ? 'selected' : ''}" onclick="toggleTempType('${type}')">${label}</button>`;
+  });
+  
+  html += `
+      </div>
+    </div>
+    
+    <!-- Maturity Status section -->
+    <div class="filter-section">
+      <div class="filter-section-title">Maturity Status</div>
+      <div class="chip-grid">
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('active') ? 'selected' : ''}" onclick="toggleTempStatus('active')">Active</button>
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('matured') ? 'selected' : ''}" onclick="toggleTempStatus('matured')">Matured</button>
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('soon') ? 'selected' : ''}" onclick="toggleTempStatus('soon')">Maturing soon (≤30 days)</button>
+        <button type="button" class="chip-btn ${tempFilterState.status.includes('closed') ? 'selected' : ''}" onclick="toggleTempStatus('closed')">Closed / Settled</button>
+      </div>
+    </div>
+  `;
+  
+  if (sources.length > 0) {
+    html += `
+      <div class="filter-section">
+        <div class="filter-section-title">Institution / Bank</div>
+        <div class="chip-grid">
+    `;
+    sources.forEach(src => {
+      const isSelected = tempFilterState.sources.includes(src);
+      html += `<button type="button" class="chip-btn ${isSelected ? 'selected' : ''}" onclick="toggleTempSource(\`${src.replace(/`/g, '\\`').replace(/"/g, '&quot;')}\`)">${src}</button>`;
+    });
+    html += `
+        </div>
+      </div>
+    `;
+  }
+  
+  const hasUnspecified = data.investments.some(i => !i.investor);
+  if (investors.length > 0 || hasUnspecified) {
+    html += `
+      <div class="filter-section">
+        <div class="filter-section-title">Investor</div>
+        <div class="chip-grid">
+    `;
+    
+    const allInvestors = [...investors];
+    if (hasUnspecified) {
+      allInvestors.push('Self/Unspecified');
+    }
+    
+    allInvestors.forEach(inv => {
+      const isSelected = tempFilterState.investors.includes(inv);
+      html += `<button type="button" class="chip-btn ${isSelected ? 'selected' : ''}" onclick="toggleTempInvestor(\`${inv.replace(/`/g, '\\`').replace(/"/g, '&quot;')}\`)">${inv}</button>`;
+    });
+    html += `
+        </div>
+      </div>
+    `;
+  }
+  
+  container.innerHTML = html;
+}
+
+function updateActiveFiltersBar() {
+  const bar = document.getElementById('active-filters-bar');
+  const badge = document.getElementById('filter-badge');
+  if (!bar) return;
+  
+  let tags = [];
+  let count = 0;
+  
+  if (filterState.types.length > 0) {
+    count += filterState.types.length;
+    const labels = filterState.types.map(t => (SCHEME_INFO[t] || {}).label || t).join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('types')">Type: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.sources.length > 0) {
+    count += filterState.sources.length;
+    const labels = filterState.sources.join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('sources')">Bank: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.investors.length > 0) {
+    count += filterState.investors.length;
+    const labels = filterState.investors.join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('investors')">Investor: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.status.length > 0) {
+    count += filterState.status.length;
+    const statusLabels = { active: 'Active', matured: 'Matured', soon: 'Maturing soon', closed: 'Closed / Settled' };
+    const labels = filterState.status.map(s => statusLabels[s] || s).join(', ');
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('status')">Status: ${labels} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (filterState.sortBy !== 'maturity' || filterState.sortDir !== 'asc') {
+    const sortFields = {
+      maturity: 'Maturity',
+      principal: 'Principal',
+      rate: 'Interest Rate',
+      start: 'Start Date',
+      added: 'Date Added'
+    };
+    const fieldLabel = sortFields[filterState.sortBy] || filterState.sortBy;
+    const dirLabel = filterState.sortDir === 'asc' ? '↑' : '↓';
+    tags.push(`<div class="fchip on" style="font-size:11px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;" onclick="clearFilterCategory('sort')">Sort: ${fieldLabel} ${dirLabel} <span style="font-weight:bold; font-size:12px; margin-left:2px;">&times;</span></div>`);
+  }
+  
+  if (tags.length > 0) {
+    tags.push(`<button class="fchip" style="font-size:11px; padding:4px 10px; background:none; border:1.5px dashed var(--red); color:var(--red); cursor:pointer;" onclick="clearAllFilters()">Clear All</button>`);
+    bar.innerHTML = tags.join('');
+    bar.style.display = 'flex';
+  } else {
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+  }
+  
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
+}
+
+function clearFilterCategory(cat) {
+  if (cat === 'sort') {
+    filterState.sortBy = 'maturity';
+    filterState.sortDir = 'asc';
+  } else {
+    filterState[cat] = [];
+  }
+  renderList();
+}
+
+function clearAllFilters() {
+  filterState.types = [];
+  filterState.sources = [];
+  filterState.investors = [];
+  filterState.status = [];
+  filterState.sortBy = 'maturity';
+  filterState.sortDir = 'asc';
+  clearSearch();
 }
 
 /* ════════════════════════════════════════
@@ -243,21 +680,29 @@ function setFilter(el) {
 ═══════════════════════════════════════════ */
 function invCard(inv) {
   const dl = daysLeft(inv.maturity);
-  const cls = maturityClass(dl);
-  const lbl = maturityLabel(dl);
+  const isClosed = inv.status === 'closed';
+  const cls = isClosed ? 'closed' : maturityClass(dl);
   const typeLabel = (SCHEME_INFO[inv.type] || {}).label || inv.type;
+  const lbl = isClosed ? 'Settled' : (maturityLabel(dl) || typeLabel);
   const source = inv.sourceCustom || inv.source || '';
   const investorInfo = inv.investor ? `👤 ${inv.investor} · ` : '';
+
+  let rateLabel = inv.rate ? inv.rate + '% p.a.' : typeLabel;
+  if (inv.type === 'RD') {
+    const progress = getRdProgress(inv);
+    rateLabel = `${inv.rate ? inv.rate + '% p.a. · ' : ''}${progress}`;
+  }
+
   return `
-  <div class="inv-card" onclick="openDetail('${inv.id}')">
+  <div class="inv-card ${isClosed ? 'is-closed' : ''}" onclick="openDetail('${inv.id}')">
     <div class="inv-card-top">
       <div class="inv-card-left">
         <div class="inv-name">${inv.name}</div>
         <div class="inv-source">${investorInfo}${source}${inv.accno ? ' · ' + inv.accno : ''}</div>
       </div>
       <div class="inv-card-right">
-        <div class="inv-amount">${fmt(inv.principal)}</div>
-        <div class="inv-rate">${inv.rate ? inv.rate + '% p.a.' : typeLabel}</div>
+        <div class="inv-amount">${fmt(getInvestedPrincipal(inv))}</div>
+        <div class="inv-rate">${rateLabel}</div>
       </div>
     </div>
     <div class="inv-card-bottom">
@@ -265,7 +710,7 @@ function invCard(inv) {
         <div class="inv-mat-label">Matures on</div>
         <div class="inv-mat-date">${fmtDate(inv.maturity)}</div>
       </div>
-      <span class="mat-chip ${cls}">${lbl || typeLabel}</span>
+      <span class="mat-chip ${cls}">${lbl}</span>
     </div>
   </div>`;
 }
@@ -274,12 +719,12 @@ function invCard(inv) {
    RENDER ALERTS
 ═══════════════════════════════════════════ */
 function renderAlerts() {
-  const invs = data.investments;
+  const invs = data.investments.filter(i => i.status !== 'closed');
   const groups = [
-    { label: '🚨 Maturing within 30 days', cls: 'red',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; }) },
-    { label: '⚠️ Maturing in 31–60 days',  cls: 'amber', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; }) },
-    { label: '🟠 Maturing in 61–90 days',  cls: 'gold',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 60 && d <= 90; }) },
-    { label: '✅ Already matured',          cls: 'green', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; }) }
+    { label: 'Maturing within 30 days', cls: 'red',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; }) },
+    { label: 'Maturing in 31–60 days',  cls: 'amber', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; }) },
+    { label: 'Maturing in 61–90 days',  cls: 'gold',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 60 && d <= 90; }) },
+    { label: 'Already matured',          cls: 'green', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; }) }
   ];
 
   let html = '';
@@ -297,7 +742,7 @@ function renderAlerts() {
               <div style="font-size:12px;color:var(--muted);margin-top:2px">${i.sourceCustom||i.source} · Matures ${fmtDate(i.maturity)}</div>
             </div>
             <div style="text-align:right">
-              <div style="font-size:14px;font-weight:700;color:var(--accent)">${fmt(i.principal)}</div>
+              <div style="font-size:14px;font-weight:700;color:var(--accent)">${fmt(getInvestedPrincipal(i))}</div>
               <div style="font-size:11px;color:var(--muted)">${maturityLabel(daysLeft(i.maturity))}</div>
             </div>
           </div>
@@ -316,7 +761,8 @@ function renderAlerts() {
 ═══════════════════════════════════════════ */
 function newInvestment() {
   editingId = null;
-  document.getElementById('form-heading').textContent = '📝 Add New Investment';
+  rolloverFromId = null;
+  document.getElementById('form-heading').textContent = 'Add New Investment';
   document.getElementById('save-btn').textContent = 'Save Investment';
   clearForm();
   showPage('add');
@@ -536,6 +982,9 @@ function saveInvestment() {
   const typeLabel = (SCHEME_INFO[type]||{}).label || type;
   const autoName = `${typeLabel} — ${sourceLabel}`;
 
+  const editingInv = editingId ? data.investments.find(i=>i.id===editingId) : null;
+  const status = editingInv ? (editingInv.status || 'active') : 'active';
+
   const inv = {
     id: editingId || uid(),
     name: autoName,
@@ -549,16 +998,25 @@ function saveInvestment() {
     matamt:    parseFloat(document.getElementById('f-matamt').value) || null,
     reminder:  parseInt(document.getElementById('f-reminder').value),
     notes:     document.getElementById('f-notes').value.trim(),
-    addedAt:   editingId ? (data.investments.find(i=>i.id===editingId)||{}).addedAt : Date.now()
+    addedAt:   editingId ? (editingInv||{}).addedAt : Date.now(),
+    status
   };
 
   if (editingId) {
     const idx = data.investments.findIndex(i => i.id === editingId);
     data.investments[idx] = inv;
-    toast('Investment updated ✓');
+    toast('Investment updated');
   } else {
     data.investments.push(inv);
-    toast('Investment saved ✓');
+    toast('Investment saved');
+
+    if (rolloverFromId) {
+      const oldIdx = data.investments.findIndex(i => i.id === rolloverFromId);
+      if (oldIdx > -1) {
+        data.investments[oldIdx].status = 'closed';
+      }
+      rolloverFromId = null;
+    }
   }
   save();
   scheduleNotifications();
@@ -569,6 +1027,7 @@ function saveInvestment() {
 
 function cancelForm() {
   editingId = null;
+  rolloverFromId = null;
   clearForm();
   showPage('home');
 }
@@ -580,8 +1039,9 @@ function openDetail(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
-  const cls = maturityClass(dl);
-  const lbl = maturityLabel(dl);
+  const isClosed = inv.status === 'closed';
+  const cls = isClosed ? 'closed' : maturityClass(dl);
+  const lbl = isClosed ? 'Settled' : (maturityLabel(dl) || 'Active');
   const source = inv.sourceCustom || inv.source || '';
 
   document.getElementById('detail-body').innerHTML = `
@@ -590,10 +1050,15 @@ function openDetail(id) {
         <div class="detail-title">${inv.name}</div>
         <div class="detail-source">${source}</div>
       </div>
-      <span class="mat-chip ${cls}">${lbl || 'Active'}</span>
+      <span class="mat-chip ${cls}">${lbl}</span>
     </div>
     <div class="detail-grid">
-      <div class="detail-row"><div class="d-lbl">Principal</div><div class="d-val" style="color:var(--accent)">${fmt(inv.principal)}</div></div>
+      ${inv.type === 'RD' ? `
+        <div class="detail-row"><div class="d-lbl">Principal (Paid so far)</div><div class="d-val" style="color:var(--accent)">${fmt(getInvestedPrincipal(inv))}</div></div>
+        <div class="detail-row"><div class="d-lbl">Total Principal</div><div class="d-val">${fmt(inv.principal)}</div></div>
+      ` : `
+        <div class="detail-row"><div class="d-lbl">Principal</div><div class="d-val" style="color:var(--accent)">${fmt(inv.principal)}</div></div>
+      `}
       <div class="detail-row"><div class="d-lbl">Type</div><div class="d-val">${(SCHEME_INFO[inv.type]||{}).label||inv.type}</div></div>
       <div class="detail-row"><div class="d-lbl">Interest rate</div><div class="d-val">${inv.rate ? inv.rate + '% p.a.' : '—'}</div></div>
       <div class="detail-row"><div class="d-lbl">Maturity amount</div><div class="d-val" style="color:var(--accent)">${fmt(inv.matamt)}</div></div>
@@ -605,11 +1070,19 @@ function openDetail(id) {
       ${inv.monthly ? `<div class="detail-row full"><div class="d-lbl">Monthly instalment</div><div class="d-val">${fmt(inv.monthly)}</div></div>` : ''}
     </div>
     <div class="detail-actions">
-      <button class="btn btn-outline" onclick="editInvestment('${inv.id}')">✏️ Edit</button>
-      <button class="btn btn-danger" onclick="deleteInvestment('${inv.id}')">🗑️ Delete</button>
+      ${!isClosed ? `
+        <button class="btn btn-primary" onclick="settleInvestment('${inv.id}')">Settle / Close</button>
+        ${dl !== null && dl <= 0 ? `
+          <button class="btn" style="background:#0b8478; color:white; border-color:#0b8478;" onclick="rolloverInvestment('${inv.id}')">Roll Over</button>
+        ` : ''}
+      ` : `
+        <button class="btn btn-primary" onclick="reopenInvestment('${inv.id}')">Reopen</button>
+      `}
+      <button class="btn btn-outline" onclick="editInvestment('${inv.id}')">Edit</button>
+      <button class="btn btn-danger" onclick="deleteInvestment('${inv.id}')">Delete</button>
     </div>
     <div class="detail-share">
-      <button class="btn btn-whatsapp" onclick="shareOneWhatsApp('${inv.id}')">📲 Share on WhatsApp</button>
+      <button class="btn btn-whatsapp" onclick="shareOneWhatsApp('${inv.id}')">Share on WhatsApp</button>
     </div>
   `;
   document.getElementById('detail-overlay').classList.add('open');
@@ -626,7 +1099,7 @@ function editInvestment(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   editingId = id;
-  document.getElementById('form-heading').textContent = '✏️ Edit Investment';
+  document.getElementById('form-heading').textContent = 'Edit Investment';
   document.getElementById('save-btn').textContent = 'Update Investment';
 
   setTimeout(() => {
@@ -664,16 +1137,116 @@ function deleteInvestment(id) {
   renderList();
 }
 
+function settleInvestment(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  inv.status = 'closed';
+  save();
+  scheduleNotifications();
+  document.getElementById('detail-overlay').classList.remove('open');
+  toast('Investment marked as Settled');
+  renderHome();
+  renderList();
+}
+
+function reopenInvestment(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  inv.status = 'active';
+  save();
+  scheduleNotifications();
+  document.getElementById('detail-overlay').classList.remove('open');
+  toast('Investment reopened');
+  renderHome();
+  renderList();
+}
+
+function rolloverInvestment(id) {
+  const inv = data.investments.find(i => i.id === id);
+  if (!inv) return;
+  
+  // Set global rolloverFromId to auto-close this on save
+  rolloverFromId = id;
+  
+  document.getElementById('detail-overlay').classList.remove('open');
+  editingId = null;
+  document.getElementById('form-heading').innerHTML = `<img src="assets/renew_investment_icon.png" alt="" style="width:20px; height:20px; vertical-align:middle; margin-right:6px; filter:brightness(0) saturate(100%) invert(29%) sepia(41%) saturate(558%) hue-rotate(73deg) brightness(98%) contrast(97%);"> Roll Over Investment`;
+  document.getElementById('save-btn').textContent = 'Save Roll Over';
+  clearForm();
+  
+  setTimeout(() => {
+    document.getElementById('f-type').value = inv.type;
+    onTypeChange();
+    document.getElementById('f-source').value = inv.source;
+    toggleOtherSource();
+    if (inv.sourceCustom) document.getElementById('f-source-custom').value = inv.sourceCustom;
+    document.getElementById('f-investor').value = inv.investor || '';
+    
+    // Principal prefilled with matured amount (or principal if not set)
+    const rolledPrincipal = inv.matamt || inv.principal;
+    document.getElementById('f-principal').value = rolledPrincipal;
+    document.getElementById('f-principal').dataset.auto = rolledPrincipal;
+    
+    // Start date is the maturity date of the old investment
+    document.getElementById('f-start').value = inv.maturity || '';
+    
+    // Autofill notes with rollover lineage details
+    document.getElementById('f-notes').value = `Rolled over from: ${inv.name} (Ref: ${inv.accno || 'N/A'})\nPrevious Principal: ${fmt(inv.principal, true)}, Matured: ${fmt(rolledPrincipal, true)}`;
+    
+    // Highlight and focus the principal input so user can add increment
+    const principalEl = document.getElementById('f-principal');
+    if (principalEl) {
+      principalEl.focus();
+      principalEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    calcMaturity();
+  }, 100);
+  
+  toast('Old investment will close when you save this rollover.');
+  showPage('add');
+}
+
 /* ════════════════════════════════════════
    NOTIFICATIONS
 ═══════════════════════════════════════════ */
+async function checkNotifPermissionGranted() {
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('LocalNotifications')) {
+    try {
+      const perm = await window.Capacitor.Plugins.LocalNotifications.checkPermissions();
+      return perm.display === 'granted';
+    } catch (e) {
+      return false;
+    }
+  }
+  return ('Notification' in window) && Notification.permission === 'granted';
+}
+
 async function requestNotifPermission() {
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('LocalNotifications')) {
+    try {
+      const result = await window.Capacitor.Plugins.LocalNotifications.requestPermissions();
+      if (result.display === 'granted') {
+        data.settings.notifEnabled = true; save();
+        await scheduleNotifications();
+        toast('Notifications enabled!');
+        dismissNotifPrompt();
+        updateNotifUI();
+      } else {
+        toast('Notification permission denied');
+      }
+    } catch (e) {
+      toast('Failed to request notification permission: ' + e.message);
+    }
+    return;
+  }
+
   if (!('Notification' in window)) { toast('Notifications not supported on this browser'); return; }
   const result = await Notification.requestPermission();
   if (result === 'granted') {
     data.settings.notifEnabled = true; save();
     scheduleNotifications();
-    toast('Notifications enabled! ✓');
+    toast('Notifications enabled!');
     dismissNotifPrompt();
     updateNotifUI();
   } else {
@@ -686,18 +1259,74 @@ function dismissNotifPrompt() {
   sessionStorage.setItem('notif_dismissed', '1');
 }
 
-function scheduleNotifications() {
+async function scheduleNotifications() {
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('LocalNotifications')) {
+    if (!data.settings.notifEnabled) return;
+    const { LocalNotifications } = window.Capacitor.Plugins;
+    try {
+      const pending = await LocalNotifications.getPending();
+      if (pending.notifications.length > 0) {
+        await LocalNotifications.cancel(pending);
+      }
+
+      const listToSchedule = [];
+      data.investments.forEach((inv, index) => {
+        if (!inv.maturity || inv.status === 'closed') return;
+        
+        const matDate = new Date(inv.maturity);
+        matDate.setHours(10, 0, 0, 0); // 10 AM
+        
+        const reminderDays = inv.reminder || 30;
+        const triggerTime = matDate.getTime() - reminderDays * 24 * 60 * 60 * 1000;
+        
+        if (triggerTime > Date.now()) {
+          const title = reminderDays === 0 ? `${inv.name} matures today!` : `${inv.name} matures in ${reminderDays} days`;
+          const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+          
+          listToSchedule.push({
+            title,
+            body,
+            id: index + 1,
+            schedule: { at: new Date(triggerTime) },
+            extra: { investmentId: inv.id }
+          });
+        } else {
+          const dl = daysLeft(inv.maturity);
+          if (dl !== null && dl >= 0 && dl <= reminderDays) {
+            const title = dl === 0 ? `${inv.name} matures today!` : `${inv.name} matures in ${dl} days`;
+            const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+            
+            listToSchedule.push({
+              title,
+              body,
+              id: index + 1,
+              schedule: { at: new Date(Date.now() + 5000) },
+              extra: { investmentId: inv.id }
+            });
+          }
+        }
+      });
+
+      if (listToSchedule.length > 0) {
+        await LocalNotifications.schedule({ notifications: listToSchedule });
+      }
+    } catch (e) {
+      console.error('Failed to schedule local notifications', e);
+    }
+    return;
+  }
+
   if (!('serviceWorker' in navigator) || !data.settings.notifEnabled) return;
   if (Notification.permission !== 'granted') return;
 
   navigator.serviceWorker.ready.then(reg => {
     data.investments.forEach(inv => {
-      if (!inv.maturity) return;
+      if (!inv.maturity || inv.status === 'closed') return;
       const dl = daysLeft(inv.maturity);
       const reminderAt = inv.reminder || 30;
       if (dl !== null && dl >= 0 && dl <= reminderAt) {
-        const title = dl === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${dl} days`;
-        const body  = `${fmt(inv.principal)} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
+        const title = dl === 0 ? `${inv.name} matures today!` : `${inv.name} matures in ${dl} days`;
+        const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
         reg.active && reg.active.postMessage({ type: 'SCHEDULE_NOTIFICATION', title, body, delay: 2000 });
       }
     });
@@ -714,8 +1343,9 @@ function toggleNotifications() {
   }
 }
 
-function updateNotifUI() {
-  const on = data.settings.notifEnabled && Notification.permission === 'granted';
+async function updateNotifUI() {
+  const granted = await checkNotifPermissionGranted();
+  const on = data.settings.notifEnabled && granted;
   document.getElementById('notif-status-text').textContent = on ? 'Enabled — reminders active' : 'Tap to enable maturity reminders';
   document.getElementById('notif-toggle-btn').textContent = on ? 'Disable' : 'Enable';
 }
@@ -724,7 +1354,7 @@ function updateNotifUI() {
    SHARE
 ═══════════════════════════════════════════ */
 function buildSummaryText() {
-  const invs = data.investments;
+  const invs = data.investments.filter(i => i.status !== 'closed');
   const urgent = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; })
                       .sort((a,b) => new Date(a.maturity) - new Date(b.maturity));
   let msg = `*📒 Nivesh Diary — Investment Summary*\n`;
@@ -733,30 +1363,60 @@ function buildSummaryText() {
     msg += `*⚠️ Maturing in next 90 days:*\n`;
     urgent.forEach(i => {
       const invInfo = i.investor ? ` [${i.investor}]` : '';
-      msg += `• ${i.name}${invInfo}\n  ${fmtDate(i.maturity)} · ${fmt(i.principal, true)}${i.matamt ? ' → ' + fmt(i.matamt, true) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
+      msg += `• ${i.name}${invInfo}\n  ${fmtDate(i.maturity)} · ${fmt(getInvestedPrincipal(i), true)}${i.matamt ? ' → ' + fmt(i.matamt, true) : ''} · ${maturityLabel(daysLeft(i.maturity))}\n`;
     });
     msg += '\n';
   }
-  const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
+  const total = invs.reduce((s,i) => s + getInvestedPrincipal(i), 0);
   msg += `*Total invested: ${fmt(total, true)}* across ${invs.length} investments`;
   return msg;
 }
 
-function shareWhatsApp() {
+async function shareWhatsApp() {
   const msg = buildSummaryText();
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      await window.Capacitor.Plugins.Share.share({
+        title: 'Nivesh Diary Summary',
+        text: msg,
+        dialogTitle: 'Share via...'
+      });
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+  }
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-function shareOneWhatsApp(id) {
+async function shareOneWhatsApp(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   const dl = daysLeft(inv.maturity);
-  const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${fmt(inv.principal, true)}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${maturityLabel(dl) || 'Active'}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+  const isClosed = inv.status === 'closed';
+  const principalStr = inv.type === 'RD'
+    ? `${fmt(getInvestedPrincipal(inv), true)} (Total: ${fmt(inv.principal, true)})`
+    : fmt(inv.principal, true);
+  const statusStr = isClosed ? 'Settled' : (maturityLabel(dl) || 'Active');
+  const msg = `📒 *Investment Details*\n\n*${inv.name}*\n${inv.investor ? 'Investor: ' + inv.investor + '\n' : ''}Institution: ${inv.sourceCustom||inv.source}\nPrincipal: ${principalStr}\n${inv.rate ? 'Rate: ' + inv.rate + '% p.a.\n' : ''}Maturity date: ${fmtDate(inv.maturity)}\n${inv.matamt ? 'Maturity amount: ' + fmt(inv.matamt, true) + '\n' : ''}Status: ${statusStr}\n${inv.accno ? 'Ref: ' + inv.accno : ''}`;
+
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      await window.Capacitor.Plugins.Share.share({
+        title: 'Investment Details',
+        text: msg,
+        dialogTitle: 'Share Details...'
+      });
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+  }
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-function shareEmail() {
-  const invs = data.investments;
+async function shareEmail() {
+  const invs = data.investments.filter(i => i.status !== 'closed');
   const urgent = invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 90; })
                       .sort((a,b) => new Date(a.maturity) - new Date(b.maturity));
   const subject = `Investment Maturity Alert — ${new Date().toLocaleDateString('en-IN')}`;
@@ -764,11 +1424,27 @@ function shareEmail() {
   if (urgent.length) {
     body += `UPCOMING MATURITIES (next 90 days):\n${'─'.repeat(40)}\n`;
     urgent.forEach(i => {
-      body += `• ${i.name}${i.investor ? ' (Investor: ' + i.investor + ')' : ''}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${fmt(i.principal, true)}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt, true) : ''}\n\n`;
+      const principalStr = i.type === 'RD'
+        ? `${fmt(getInvestedPrincipal(i), true)} (Total: ${fmt(i.principal, true)})`
+        : fmt(i.principal, true);
+      body += `• ${i.name}${i.investor ? ' (Investor: ' + i.investor + ')' : ''}\n  Source: ${i.sourceCustom||i.source}\n  Principal: ${principalStr}\n  Maturity: ${fmtDate(i.maturity)} (${maturityLabel(daysLeft(i.maturity))})\n  ${i.matamt ? 'Expected return: ' + fmt(i.matamt, true) : ''}\n\n`;
     });
   }
-  const total = invs.reduce((s,i) => s + Number(i.principal||0), 0);
+  const total = invs.reduce((s,i) => s + getInvestedPrincipal(i), 0);
   body += `\nTOTAL INVESTED: ${fmt(total, true)} across ${invs.length} investments\n\n— Sent from Nivesh Diary`;
+
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      await window.Capacitor.Plugins.Share.share({
+        title: subject,
+        text: body,
+        dialogTitle: 'Send Email Summary...'
+      });
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+  }
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
@@ -867,7 +1543,6 @@ async function decryptBackup(encryptedObj, password) {
 }
 
 async function exportData() {
-  closeSheet(null, 'backup-overlay', true);
   const pwd = await promptPassword("Encrypt Backup", "Enter an optional password to encrypt your backup (leave empty for no encryption):", "Optional Password");
   if (pwd === null) return; // User clicked Cancel
   
@@ -881,6 +1556,36 @@ async function exportData() {
     }
   }
 
+  // Check if we are running under Capacitor with Filesystem and Share plugins
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Filesystem') && window.Capacitor.isPluginAvailable('Share')) {
+    try {
+      const fileName = `nivesh-diary-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+
+      // Write to CACHE directory (does not require runtime permissions)
+      const result = await Filesystem.writeFile({
+        path: fileName,
+        data: outData,
+        directory: 'CACHE',
+        encoding: 'utf8'
+      });
+
+      // Share the file natively
+      await Share.share({
+        title: 'Nivesh Diary Backup',
+        text: 'Nivesh Diary investment backup file.',
+        url: result.uri,
+        dialogTitle: 'Save Backup File'
+      });
+
+      toast('Backup prepared');
+    } catch (e) {
+      toast('Export failed: ' + e.message);
+      console.error(e);
+    }
+    return;
+  }
+
   const blob = new Blob([outData], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -888,7 +1593,7 @@ async function exportData() {
   a.download = `nivesh-diary-backup-${new Date().toISOString().split('T')[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  toast('Backup downloaded ✓');
+  toast('Backup downloaded');
 }
 
 function importData(event) {
@@ -897,9 +1602,6 @@ function importData(event) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      // Hide backup overlay so prompt is visible cleanly
-      closeSheet(null, 'backup-overlay', true);
-
       let imported = JSON.parse(e.target.result);
       
       // Decryption Logic
@@ -931,7 +1633,7 @@ function importData(event) {
         if (!existingIds.has(inv.id)) data.investments.push(inv);
       });
       save();
-      toast(`Imported ${imported.investments.length} records ✓`);
+      toast(`Imported ${imported.investments.length} records`);
       renderHome();
       renderList();
     } catch(err) {
@@ -949,20 +1651,8 @@ function confirmDeleteAll() {
   data.investments = [];
   save();
   toast('All data deleted');
-  closeSheet(null, 'backup-overlay', true);
   renderHome();
 }
-
-function openSheet(id) {
-  document.getElementById(id.includes('backup') ? 'backup-overlay' : id).classList.add('open');
-  updateNotifUI();
-}
-function closeSheet(e, id, force) {
-  if (force || !e || e.target === document.getElementById(id)) {
-    document.getElementById(id).classList.remove('open');
-  }
-}
-document.getElementById('backup-overlay').addEventListener('click', e => closeSheet(e, 'backup-overlay'));
 
 /* ════════════════════════════════════════
    PWA INSTALL
@@ -978,7 +1668,7 @@ function installPWA() {
   deferredInstallPrompt.userChoice.then(r => {
     if (r.outcome === 'accepted') {
       document.getElementById('install-banner').style.display = 'none';
-      toast('App installed! 🎉 Find it on your home screen.');
+      toast('App installed! Find it on your home screen.');
     }
     deferredInstallPrompt = null;
   });
@@ -1016,11 +1706,11 @@ function init() {
   updateHideUI();
 
   // Show notif prompt if not dismissed and not yet granted
-  if (!sessionStorage.getItem('notif_dismissed') &&
-      'Notification' in window &&
-      Notification.permission === 'default') {
-    document.getElementById('notif-prompt').classList.add('show');
-  }
+  checkNotifPermissionGranted().then(granted => {
+    if (!granted && !sessionStorage.getItem('notif_dismissed')) {
+      document.getElementById('notif-prompt').classList.add('show');
+    }
+  });
 
   renderHome();
 
@@ -1034,14 +1724,16 @@ function init() {
       { type:'NSC',  source:'India Post / Post Office',  principal:50000,  rate:7.7, start: fmt2(new Date(today.getFullYear()-3, 4, 15)), maturity: fmt2(new Date(today.getFullYear()+2, 4, 15)), matamt:71893 },
       { type:'KVP',  source:'India Post / Post Office',  principal:100000, rate:null, start: fmt2(new Date(today.getFullYear()-2, 0, 10)), maturity: fmt2(new Date(today.getFullYear()+7, 7, 10)), matamt:200000, notes:'Certificate no. KVP-2022-10012' },
       { type:'SCSS', source:'State Bank of India (SBI)', principal:300000, rate:8.2, start: fmt2(new Date(today.getFullYear()-1, 6, 1)), maturity: fmt2(new Date(today.getFullYear()+4, 6, 1)), matamt:435960, notes:'Quarterly interest payout to savings account.' },
+      { type:'RD',   source:'HDFC Bank',                 principal:120000, rate:6.5, start: fmt2(new Date(today.getFullYear(), today.getMonth()-6, today.getDate())), maturity: fmt2(addMonths2(today, 18)), matamt:128500, monthly:5000, notes:'Monthly contribution via SI.' },
     ];
     samples.forEach(s => {
       data.investments.push({ id: uid(), name: `${(SCHEME_INFO[s.type]||{}).label||s.type} — ${s.source}`, addedAt: Date.now()-Math.random()*1e9, reminder: 30, accno:'', monthly:null, sourceCustom:'', ...s });
     });
     save();
     renderHome();
-    toast('Loaded with sample data — tap any card to explore 👆');
+    toast('Loaded with sample data — tap any card to explore');
   }
+  scheduleNotifications();
 }
 
 init();
