@@ -40,7 +40,6 @@
 
   <!-- Install banner (shown when PWA can be installed) -->
   <div class="install-banner" id="install-banner" onclick="installPWA()">
-    <span style="font-size:28px">📲</span>
     <div>
       <strong>Add to Home Screen</strong>
       <p>Install this app for quick access and notifications</p>
@@ -49,7 +48,6 @@
 
   <!-- Notification permission prompt -->
   <div class="notif-prompt" id="notif-prompt">
-    <img src="assets/notifications_active_icon.png" alt="Reminders" style="width: 22px; height: 22px; vertical-align: middle; object-fit: contain;">
     <div style="flex:1">
       <div style="font-size:13px;font-weight:600;margin-bottom:4px">Enable maturity reminders</div>
       <div style="font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:10px">Get notified before your investments mature, even when the app is closed.</div>
@@ -83,7 +81,7 @@
   <div class="list-header-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
     <h2 style="font-family:'Lora',serif; font-size:16px; font-weight:600; color:var(--text);">My Investments</h2>
     <button class="btn-sm" onclick="openFilterSheet()" style="display:flex; align-items:center; gap:6px;">
-      <span>🎛️</span> Filter & Sort
+      Filter & Sort
       <span id="filter-badge" style="display:none; background:var(--accent); color:white; font-size:10px; font-weight:bold; min-width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center;">0</span>
     </button>
   </div>
@@ -264,8 +262,8 @@
 
   <div class="sec-head" style="margin-top:24px">Send Summary</div>
   <div style="display:grid;gap:10px">
-    <button class="btn btn-whatsapp" onclick="shareWhatsApp()">📲 Share via WhatsApp</button>
-    <button class="btn btn-email"    onclick="shareEmail()">📧 Send Email Summary</button>
+    <button class="btn btn-whatsapp" onclick="shareWhatsApp()">Share via WhatsApp</button>
+    <button class="btn btn-email"    onclick="shareEmail()">Send Email Summary</button>
   </div>
 </div>
 

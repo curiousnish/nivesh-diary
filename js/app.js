@@ -242,7 +242,6 @@ function renderHome() {
   let alerts = '';
   if (urgent.length) {
     alerts += `<div class="alert-banner red">
-      <div class="alert-icon">🚨</div>
       <div class="alert-body">
         <div class="alert-title">${urgent.length} investment${urgent.length>1?'s':''} maturing within 30 days!</div>
         <div class="alert-desc">${urgent.map(i => `${i.name} (${fmtDate(i.maturity)})`).join(', ')}. Visit Alerts tab to take action.</div>
@@ -252,7 +251,6 @@ function renderHome() {
   const soon60 = activeInvs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; });
   if (soon60.length) {
     alerts += `<div class="alert-banner amber">
-      <div class="alert-icon">⚠️</div>
       <div class="alert-body">
         <div class="alert-title">${soon60.length} maturing in 31–60 days</div>
         <div class="alert-desc">${soon60.map(i => i.name).join(', ')}</div>
@@ -261,7 +259,6 @@ function renderHome() {
   }
   if (maturedUnclosedInvs.length) {
     alerts += `<div class="alert-banner green">
-      <div class="alert-icon">✅</div>
       <div class="alert-body">
         <div class="alert-title">${maturedUnclosedInvs.length} investment${maturedUnclosedInvs.length>1?'s':''} already matured</div>
         <div class="alert-desc">Please update, reinvest, or mark as settled: ${maturedUnclosedInvs.map(i=>i.name).join(', ')}</div>
@@ -278,7 +275,7 @@ function renderHome() {
   const sorted = [...upcoming].sort((a, b) => new Date(a.maturity) - new Date(b.maturity));
   document.getElementById('home-upcoming').innerHTML = sorted.length
     ? sorted.map(i => invCard(i)).join('')
-    : `<div style="padding:16px;text-align:center;color:var(--muted);font-size:14px">No maturities in the next 90 days 🎉</div>`;
+    : `<div style="padding:16px;text-align:center;color:var(--muted);font-size:14px">No maturities in the next 90 days</div>`;
 
   // Recent (last 4 active)
   const recent = [...activeInvs].sort((a,b) => b.addedAt - a.addedAt).slice(0, 4);
@@ -724,10 +721,10 @@ function invCard(inv) {
 function renderAlerts() {
   const invs = data.investments.filter(i => i.status !== 'closed');
   const groups = [
-    { label: '🚨 Maturing within 30 days', cls: 'red',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; }) },
-    { label: '⚠️ Maturing in 31–60 days',  cls: 'amber', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; }) },
-    { label: '🟠 Maturing in 61–90 days',  cls: 'gold',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 60 && d <= 90; }) },
-    { label: '✅ Already matured',          cls: 'green', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; }) }
+    { label: 'Maturing within 30 days', cls: 'red',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d >= 0 && d <= 30; }) },
+    { label: 'Maturing in 31–60 days',  cls: 'amber', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 30 && d <= 60; }) },
+    { label: 'Maturing in 61–90 days',  cls: 'gold',  invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d > 60 && d <= 90; }) },
+    { label: 'Already matured',          cls: 'green', invs: invs.filter(i => { const d = daysLeft(i.maturity); return d !== null && d < 0; }) }
   ];
 
   let html = '';
@@ -1008,10 +1005,10 @@ function saveInvestment() {
   if (editingId) {
     const idx = data.investments.findIndex(i => i.id === editingId);
     data.investments[idx] = inv;
-    toast('Investment updated ✓');
+    toast('Investment updated');
   } else {
     data.investments.push(inv);
-    toast('Investment saved ✓');
+    toast('Investment saved');
 
     if (rolloverFromId) {
       const oldIdx = data.investments.findIndex(i => i.id === rolloverFromId);
@@ -1074,18 +1071,18 @@ function openDetail(id) {
     </div>
     <div class="detail-actions">
       ${!isClosed ? `
-        <button class="btn btn-primary" onclick="settleInvestment('${inv.id}')">✅ Settle / Close</button>
+        <button class="btn btn-primary" onclick="settleInvestment('${inv.id}')">Settle / Close</button>
         ${dl !== null && dl <= 0 ? `
-          <button class="btn" style="background:#0b8478; color:white; border-color:#0b8478;" onclick="rolloverInvestment('${inv.id}')"><img src="assets/renew_investment_icon.png" alt="" style="width:20px; height:20px; margin-right:8px; object-fit:contain; filter:brightness(0) invert(1);">Roll Over</button>
+          <button class="btn" style="background:#0b8478; color:white; border-color:#0b8478;" onclick="rolloverInvestment('${inv.id}')">Roll Over</button>
         ` : ''}
       ` : `
-        <button class="btn btn-primary" onclick="reopenInvestment('${inv.id}')">🔓 Reopen</button>
+        <button class="btn btn-primary" onclick="reopenInvestment('${inv.id}')">Reopen</button>
       `}
-      <button class="btn btn-outline" onclick="editInvestment('${inv.id}')">✏️ Edit</button>
-      <button class="btn btn-danger" onclick="deleteInvestment('${inv.id}')">🗑️ Delete</button>
+      <button class="btn btn-outline" onclick="editInvestment('${inv.id}')">Edit</button>
+      <button class="btn btn-danger" onclick="deleteInvestment('${inv.id}')">Delete</button>
     </div>
     <div class="detail-share">
-      <button class="btn btn-whatsapp" onclick="shareOneWhatsApp('${inv.id}')">📲 Share on WhatsApp</button>
+      <button class="btn btn-whatsapp" onclick="shareOneWhatsApp('${inv.id}')">Share on WhatsApp</button>
     </div>
   `;
   document.getElementById('detail-overlay').classList.add('open');
@@ -1147,7 +1144,7 @@ function settleInvestment(id) {
   save();
   scheduleNotifications();
   document.getElementById('detail-overlay').classList.remove('open');
-  toast('Investment marked as Settled ✓');
+  toast('Investment marked as Settled');
   renderHome();
   renderList();
 }
@@ -1159,7 +1156,7 @@ function reopenInvestment(id) {
   save();
   scheduleNotifications();
   document.getElementById('detail-overlay').classList.remove('open');
-  toast('Investment reopened ✓');
+  toast('Investment reopened');
   renderHome();
   renderList();
 }
@@ -1232,7 +1229,7 @@ async function requestNotifPermission() {
       if (result.display === 'granted') {
         data.settings.notifEnabled = true; save();
         await scheduleNotifications();
-        toast('Notifications enabled! ✓');
+        toast('Notifications enabled!');
         dismissNotifPrompt();
         updateNotifUI();
       } else {
@@ -1249,7 +1246,7 @@ async function requestNotifPermission() {
   if (result === 'granted') {
     data.settings.notifEnabled = true; save();
     scheduleNotifications();
-    toast('Notifications enabled! ✓');
+    toast('Notifications enabled!');
     dismissNotifPrompt();
     updateNotifUI();
   } else {
@@ -1283,7 +1280,7 @@ async function scheduleNotifications() {
         const triggerTime = matDate.getTime() - reminderDays * 24 * 60 * 60 * 1000;
         
         if (triggerTime > Date.now()) {
-          const title = reminderDays === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${reminderDays} days`;
+          const title = reminderDays === 0 ? `${inv.name} matures today!` : `${inv.name} matures in ${reminderDays} days`;
           const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
           
           listToSchedule.push({
@@ -1296,7 +1293,7 @@ async function scheduleNotifications() {
         } else {
           const dl = daysLeft(inv.maturity);
           if (dl !== null && dl >= 0 && dl <= reminderDays) {
-            const title = dl === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${dl} days`;
+            const title = dl === 0 ? `${inv.name} matures today!` : `${inv.name} matures in ${dl} days`;
             const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
             
             listToSchedule.push({
@@ -1328,7 +1325,7 @@ async function scheduleNotifications() {
       const dl = daysLeft(inv.maturity);
       const reminderAt = inv.reminder || 30;
       if (dl !== null && dl >= 0 && dl <= reminderAt) {
-        const title = dl === 0 ? `🔴 ${inv.name} matures today!` : `⚠️ ${inv.name} matures in ${dl} days`;
+        const title = dl === 0 ? `${inv.name} matures today!` : `${inv.name} matures in ${dl} days`;
         const body  = `${fmt(getInvestedPrincipal(inv))} at ${inv.sourceCustom||inv.source}. Maturity date: ${fmtDate(inv.maturity)}`;
         reg.active && reg.active.postMessage({ type: 'SCHEDULE_NOTIFICATION', title, body, delay: 2000 });
       }
@@ -1581,7 +1578,7 @@ async function exportData() {
         dialogTitle: 'Save Backup File'
       });
 
-      toast('Backup prepared ✓');
+      toast('Backup prepared');
     } catch (e) {
       toast('Export failed: ' + e.message);
       console.error(e);
@@ -1596,7 +1593,7 @@ async function exportData() {
   a.download = `nivesh-diary-backup-${new Date().toISOString().split('T')[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  toast('Backup downloaded ✓');
+  toast('Backup downloaded');
 }
 
 function importData(event) {
@@ -1636,7 +1633,7 @@ function importData(event) {
         if (!existingIds.has(inv.id)) data.investments.push(inv);
       });
       save();
-      toast(`Imported ${imported.investments.length} records ✓`);
+      toast(`Imported ${imported.investments.length} records`);
       renderHome();
       renderList();
     } catch(err) {
@@ -1671,7 +1668,7 @@ function installPWA() {
   deferredInstallPrompt.userChoice.then(r => {
     if (r.outcome === 'accepted') {
       document.getElementById('install-banner').style.display = 'none';
-      toast('App installed! 🎉 Find it on your home screen.');
+      toast('App installed! Find it on your home screen.');
     }
     deferredInstallPrompt = null;
   });
@@ -1734,7 +1731,7 @@ function init() {
     });
     save();
     renderHome();
-    toast('Loaded with sample data — tap any card to explore 👆');
+    toast('Loaded with sample data — tap any card to explore');
   }
   scheduleNotifications();
 }
