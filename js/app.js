@@ -762,7 +762,7 @@ function renderAlerts() {
 function newInvestment() {
   editingId = null;
   rolloverFromId = null;
-  document.getElementById('form-heading').textContent = '📝 Add New Investment';
+  document.getElementById('form-heading').textContent = 'Add New Investment';
   document.getElementById('save-btn').textContent = 'Save Investment';
   clearForm();
   showPage('add');
@@ -1099,7 +1099,7 @@ function editInvestment(id) {
   const inv = data.investments.find(i => i.id === id);
   if (!inv) return;
   editingId = id;
-  document.getElementById('form-heading').textContent = '✏️ Edit Investment';
+  document.getElementById('form-heading').textContent = 'Edit Investment';
   document.getElementById('save-btn').textContent = 'Update Investment';
 
   setTimeout(() => {
