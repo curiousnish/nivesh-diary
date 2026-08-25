@@ -62,7 +62,10 @@ function showPage(name) {
   if (name === 'home')     renderHome();
   if (name === 'list')     renderList();
   if (name === 'alerts')   renderAlerts();
-  if (name === 'settings') updateNotifUI();
+  if (name === 'settings') {
+    updateNotifUI();
+    updateAppPasswordSettingsUI();
+  }
 }
 
 /* ════════════════════════════════════════
@@ -133,6 +136,14 @@ function maturityLabel(dl) {
   return dl + ' days left';
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
 
 function addMonths(dateStr, months) {
   const d = new Date(dateStr);
@@ -1655,6 +1666,160 @@ function confirmDeleteAll() {
 }
 
 /* ════════════════════════════════════════
+   APP PASSWORD LOCK
+═══════════════════════════════════════════ */
+async function setUpAppPassword() {
+  const newPwd = await promptPassword("Set App Password", "Enter a new password to lock the app on startup:", "Enter Password");
+  if (!newPwd) return;
+  
+  const confirmPwd = await promptPassword("Confirm Password", "Re-enter the password to confirm:", "Confirm Password");
+  if (!confirmPwd) return;
+  
+  if (newPwd !== confirmPwd) {
+    toast("Passwords do not match!");
+    return;
+  }
+  
+  data.settings.appPassword = await sha256(newPwd);
+  save();
+  sessionStorage.setItem('nivesh_diary_unlocked', 'true');
+  toast("App password set successfully!");
+  
+  const prompt = document.getElementById('password-setup-prompt');
+  if (prompt) prompt.classList.remove('show');
+  
+  updateAppPasswordSettingsUI();
+  updateManualLockButtonVisibility();
+}
+
+async function changeAppPassword() {
+  const currentPwd = await promptPassword("Current Password", "Enter your current app password:", "Current Password");
+  if (!currentPwd) return;
+  
+  if (await sha256(currentPwd) !== data.settings.appPassword) {
+    toast("Incorrect password!");
+    return;
+  }
+  
+  const newPwd = await promptPassword("New Password", "Enter your new app password:", "New Password");
+  if (!newPwd) return;
+  
+  const confirmPwd = await promptPassword("Confirm Password", "Re-enter the new password to confirm:", "Confirm Password");
+  if (!confirmPwd) return;
+  
+  if (newPwd !== confirmPwd) {
+    toast("Passwords do not match!");
+    return;
+  }
+  
+  data.settings.appPassword = await sha256(newPwd);
+  save();
+  toast("App password changed successfully!");
+}
+
+async function disableAppPassword() {
+  const currentPwd = await promptPassword("Current Password", "Enter your current app password to disable protection:", "Current Password");
+  if (!currentPwd) return;
+  
+  if (await sha256(currentPwd) !== data.settings.appPassword) {
+    toast("Incorrect password!");
+    return;
+  }
+  
+  data.settings.appPassword = null;
+  save();
+  sessionStorage.removeItem('nivesh_diary_unlocked');
+  toast("App password disabled");
+  updateAppPasswordSettingsUI();
+  showPasswordSetupPromptIfNeeded();
+  updateManualLockButtonVisibility();
+}
+
+function updateAppPasswordSettingsUI() {
+  const row = document.getElementById('app-pwd-row');
+  if (!row) return;
+  if (data.settings.appPassword) {
+    row.innerHTML = `
+      <div>
+        <div class="s-label">App Password</div>
+        <div class="s-desc">Password protection is enabled</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-sm" onclick="changeAppPassword()">Change</button>
+        <button class="btn-sm" style="color:var(--red);border-color:#FECACA" onclick="disableAppPassword()">Disable</button>
+      </div>
+    `;
+  } else {
+    row.innerHTML = `
+      <div>
+        <div class="s-label">App Password</div>
+        <div class="s-desc">Lock your investment data on launch</div>
+      </div>
+      <button class="btn-sm" onclick="setUpAppPassword()" style="background:var(--accent);color:white;border-color:var(--accent)">Set Up</button>
+    `;
+  }
+}
+
+function showPasswordSetupPromptIfNeeded() {
+  if (!data.settings.appPassword && !sessionStorage.getItem('app_pwd_prompt_dismissed')) {
+    const prompt = document.getElementById('password-setup-prompt');
+    if (prompt) prompt.classList.add('show');
+  }
+}
+
+function dismissPasswordPrompt() {
+  sessionStorage.setItem('app_pwd_prompt_dismissed', '1');
+  const prompt = document.getElementById('password-setup-prompt');
+  if (prompt) prompt.classList.remove('show');
+}
+
+async function verifyUnlockPassword() {
+  const input = document.getElementById('unlock-pwd-input');
+  const errorEl = document.getElementById('unlock-error');
+  const password = input.value;
+  if (!password) {
+    errorEl.textContent = 'Please enter password';
+    return;
+  }
+  const hashed = await sha256(password);
+  if (hashed === data.settings.appPassword) {
+    sessionStorage.setItem('nivesh_diary_unlocked', 'true');
+    document.documentElement.classList.remove('app-locked');
+    updateManualLockButtonVisibility();
+    input.value = '';
+    errorEl.textContent = '';
+    toast('Welcome back!');
+    showPasswordSetupPromptIfNeeded();
+  } else {
+    errorEl.textContent = 'Incorrect password. Please try again.';
+    input.value = '';
+    input.focus();
+  }
+}
+
+function updateManualLockButtonVisibility() {
+  const lockBtn = document.getElementById('manual-lock-btn');
+  if (!lockBtn) return;
+  if (data.settings.appPassword && sessionStorage.getItem('nivesh_diary_unlocked') === 'true') {
+    lockBtn.style.display = 'flex';
+  } else {
+    lockBtn.style.display = 'none';
+  }
+}
+
+function manualLockApp() {
+  sessionStorage.removeItem('nivesh_diary_unlocked');
+  document.documentElement.classList.add('app-locked');
+  updateManualLockButtonVisibility();
+  const input = document.getElementById('unlock-pwd-input');
+  if (input) {
+    input.value = '';
+    setTimeout(() => input.focus(), 100);
+  }
+  toast("App locked");
+}
+
+/* ════════════════════════════════════════
    PWA INSTALL
 ═══════════════════════════════════════════ */
 window.addEventListener('beforeinstallprompt', e => {
@@ -1704,6 +1869,20 @@ function toast(msg) {
 function init() {
   load();
   updateHideUI();
+  updateAppPasswordSettingsUI();
+
+  // If locked, ensure app-locked class is added and focus input
+  if (data.settings.appPassword && sessionStorage.getItem('nivesh_diary_unlocked') !== 'true') {
+    document.documentElement.classList.add('app-locked');
+    updateManualLockButtonVisibility();
+    setTimeout(() => {
+      const input = document.getElementById('unlock-pwd-input');
+      if (input) input.focus();
+    }, 100);
+  } else {
+    updateManualLockButtonVisibility();
+    showPasswordSetupPromptIfNeeded();
+  }
 
   // Show notif prompt if not dismissed and not yet granted
   checkNotifPermissionGranted().then(granted => {
