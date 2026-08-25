@@ -22,8 +22,9 @@ function load() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) data = JSON.parse(raw);
     if (!data.investments) data.investments = [];
-    if (!data.settings) data.settings = { reminderDays: 30, notifEnabled: false, hideAmounts: false };
+    if (!data.settings) data.settings = { reminderDays: 30, notifEnabled: false, hideAmounts: false, autoLockMinutes: 5 };
     if (data.settings.hideAmounts === undefined) data.settings.hideAmounts = false;
+    if (data.settings.autoLockMinutes === undefined) data.settings.autoLockMinutes = 5;
   } catch(e) {}
 }
 function save() {
@@ -1588,7 +1589,6 @@ async function exportData() {
         url: result.uri,
         dialogTitle: 'Save Backup File'
       });
-
       toast('Backup prepared');
     } catch (e) {
       toast('Export failed: ' + e.message);
@@ -1681,6 +1681,7 @@ async function setUpAppPassword() {
   }
   
   data.settings.appPassword = await sha256(newPwd);
+  data.settings.autoLockMinutes = 5;
   save();
   sessionStorage.setItem('nivesh_diary_unlocked', 'true');
   toast("App password set successfully!");
@@ -1690,6 +1691,7 @@ async function setUpAppPassword() {
   
   updateAppPasswordSettingsUI();
   updateManualLockButtonVisibility();
+  resetInactivityTimer();
 }
 
 async function changeAppPassword() {
@@ -1729,6 +1731,7 @@ async function disableAppPassword() {
   data.settings.appPassword = null;
   save();
   sessionStorage.removeItem('nivesh_diary_unlocked');
+  clearTimeout(inactivityTimer);
   toast("App password disabled");
   updateAppPasswordSettingsUI();
   showPasswordSetupPromptIfNeeded();
@@ -1739,12 +1742,23 @@ function updateAppPasswordSettingsUI() {
   const row = document.getElementById('app-pwd-row');
   if (!row) return;
   if (data.settings.appPassword) {
+    const lockTime = data.settings.autoLockMinutes || 5;
     row.innerHTML = `
-      <div>
+      <div style="flex: 1;">
         <div class="s-label">App Password</div>
         <div class="s-desc">Password protection is enabled</div>
+        <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 12px; color: var(--muted);">Auto-lock:</span>
+          <select id="auto-lock-select" onchange="changeAutoLockTime(this.value)" style="padding: 4px 6px; font-size: 12px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);">
+            <option value="1" ${lockTime === 1 ? 'selected' : ''}>1 minute</option>
+            <option value="3" ${lockTime === 3 ? 'selected' : ''}>3 minutes</option>
+            <option value="5" ${lockTime === 5 ? 'selected' : ''}>5 minutes</option>
+            <option value="10" ${lockTime === 10 ? 'selected' : ''}>10 minutes</option>
+            <option value="never" ${lockTime === 'never' ? 'selected' : ''}>Never</option>
+          </select>
+        </div>
       </div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; align-self: flex-start; margin-top: 2px;">
         <button class="btn-sm" onclick="changeAppPassword()">Change</button>
         <button class="btn-sm" style="color:var(--red);border-color:#FECACA" onclick="disableAppPassword()">Disable</button>
       </div>
@@ -1790,6 +1804,7 @@ async function verifyUnlockPassword() {
     errorEl.textContent = '';
     toast('Welcome back!');
     showPasswordSetupPromptIfNeeded();
+    resetInactivityTimer();
   } else {
     errorEl.textContent = 'Incorrect password. Please try again.';
     input.value = '';
@@ -1811,6 +1826,7 @@ function manualLockApp() {
   sessionStorage.removeItem('nivesh_diary_unlocked');
   document.documentElement.classList.add('app-locked');
   updateManualLockButtonVisibility();
+  clearTimeout(inactivityTimer);
   const input = document.getElementById('unlock-pwd-input');
   if (input) {
     input.value = '';
@@ -1818,6 +1834,55 @@ function manualLockApp() {
   }
   toast("App locked");
 }
+
+let inactivityTimer = null;
+
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  if (!data.settings || !data.settings.appPassword) return;
+  if (sessionStorage.getItem('nivesh_diary_unlocked') !== 'true') return;
+  
+  const val = data.settings.autoLockMinutes;
+  if (val === 'never') return;
+  
+  const minutes = parseInt(val) || 5;
+  inactivityTimer = setTimeout(() => {
+    if (sessionStorage.getItem('nivesh_diary_unlocked') === 'true') {
+      manualLockApp();
+      toast('Locked due to inactivity');
+    }
+  }, minutes * 60 * 1000);
+}
+
+function initInactivityListeners() {
+  ['click', 'mousemove', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+    document.addEventListener(evt, resetInactivityTimer, { passive: true });
+  });
+}
+
+function changeAutoLockTime(val) {
+  const parsed = val === 'never' ? 'never' : parseInt(val);
+  data.settings.autoLockMinutes = parsed;
+  save();
+  resetInactivityTimer();
+  toast('Auto-lock preference updated');
+}
+
+// Lock the app when it loses visibility or focus (backgrounded / tab switch / screen off)
+// This also ensures that the recents app switcher displays the lock screen instead of financial records.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (data.settings.appPassword && sessionStorage.getItem('nivesh_diary_unlocked') === 'true') {
+      manualLockApp();
+    }
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  if (data.settings.appPassword && sessionStorage.getItem('nivesh_diary_unlocked') === 'true') {
+    manualLockApp();
+  }
+});
 
 /* ════════════════════════════════════════
    PWA INSTALL
@@ -1912,6 +1977,7 @@ function init() {
     renderHome();
     toast('Loaded with sample data — tap any card to explore');
   }
+  initInactivityListeners();
   scheduleNotifications();
 }
 
