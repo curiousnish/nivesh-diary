@@ -1568,28 +1568,86 @@ async function exportData() {
     }
   }
 
-  // Check if we are running under Capacitor with Filesystem and Share plugins
-  if (window.Capacitor && window.Capacitor.isPluginAvailable('Filesystem') && window.Capacitor.isPluginAvailable('Share')) {
+  // Check if we are running under Capacitor with Filesystem plugin
+  if (window.Capacitor && window.Capacitor.isPluginAvailable('Filesystem')) {
     try {
       const fileName = `nivesh-diary-backup-${new Date().toISOString().split('T')[0]}.json`;
       const { Filesystem, Share } = window.Capacitor.Plugins;
 
-      // Write to CACHE directory (does not require runtime permissions)
-      const result = await Filesystem.writeFile({
-        path: fileName,
-        data: outData,
-        directory: 'CACHE',
-        encoding: 'utf8'
-      });
+      // Request permissions if available (mainly for older Android support)
+      try {
+        if (typeof Filesystem.checkPermissions === 'function') {
+          const status = await Filesystem.checkPermissions();
+          if (status && status.publicStorage !== 'granted' && typeof Filesystem.requestPermissions === 'function') {
+            await Filesystem.requestPermissions();
+          }
+        }
+      } catch (pe) {
+        console.warn('Permission request failed or unsupported:', pe);
+      }
 
-      // Share the file natively
-      await Share.share({
-        title: 'Nivesh Diary Backup',
-        text: 'Nivesh Diary investment backup file.',
-        url: result.uri,
-        dialogTitle: 'Save Backup File'
-      });
-      toast('Backup prepared');
+      const saveToDir = async (dir, folder, file, data) => {
+        // Create directory recursively
+        await Filesystem.mkdir({
+          path: folder,
+          directory: dir,
+          recursive: true
+        });
+        // Write the file
+        return await Filesystem.writeFile({
+          path: folder + '/' + file,
+          data: data,
+          directory: dir,
+          encoding: 'utf8'
+        });
+      };
+
+      let saved = false;
+      let targetPath = '';
+
+      // 1. Try to save to "Download/Nivesh Diary" folder on EXTERNAL_STORAGE (Android 9/10 with legacy external storage)
+      try {
+        await saveToDir('EXTERNAL_STORAGE', 'Download/Nivesh Diary', fileName, outData);
+        saved = true;
+        targetPath = `downloads/Nivesh Diary/${fileName}`;
+      } catch (err) {
+        console.warn('Could not save to EXTERNAL_STORAGE:', err);
+      }
+
+      // 2. Try to save to "Nivesh Diary" folder on DOCUMENTS (Android 11+ / iOS)
+      if (!saved) {
+        try {
+          await saveToDir('DOCUMENTS', 'Nivesh Diary', fileName, outData);
+          saved = true;
+          targetPath = `Documents/Nivesh Diary/${fileName}`;
+        } catch (err) {
+          console.warn('Could not save to DOCUMENTS:', err);
+        }
+      }
+
+      if (saved) {
+        toast(`Backup saved: ${targetPath}`);
+      } else {
+        // Fallback: Write to Cache and share using Share plugin
+        const result = await Filesystem.writeFile({
+          path: fileName,
+          data: outData,
+          directory: 'CACHE',
+          encoding: 'utf8'
+        });
+
+        if (Share) {
+          await Share.share({
+            title: 'Nivesh Diary Backup',
+            text: 'Nivesh Diary investment backup file.',
+            url: result.uri,
+            dialogTitle: 'Save Backup File'
+          });
+          toast('Backup prepared');
+        } else {
+          toast('Backup saved to Cache: ' + result.uri);
+        }
+      }
     } catch (e) {
       toast('Export failed: ' + e.message);
       console.error(e);
