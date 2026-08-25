@@ -14,6 +14,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<script>
+  (function() {
+    try {
+      var raw = localStorage.getItem('nivesh_diary_v2');
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.settings && parsed.settings.appPassword && sessionStorage.getItem('nivesh_diary_unlocked') !== 'true') {
+          document.documentElement.classList.add('app-locked');
+        }
+      }
+    } catch(e) {}
+  })();
+</script>
 </head>
 <body>
 
@@ -29,6 +42,9 @@
   <div class="nav-actions">
     <div class="icon-btn" id="hide-toggle-btn" onclick="toggleHideAmounts()" title="Toggle Visibility">
       <img src="assets/visible_eye_icon.png" alt="Toggle Visibility">
+    </div>
+    <div class="icon-btn" id="manual-lock-btn" onclick="manualLockApp()" title="Lock App" style="display: none;">
+      <img src="assets/password_lock_icon.png" alt="Lock App">
     </div>
   </div>
 </nav>
@@ -53,6 +69,16 @@
       <div style="font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:10px">Get notified before your investments mature, even when the app is closed.</div>
       <button class="btn-sm" onclick="requestNotifPermission()" style="background:var(--accent);color:white;border-color:var(--accent)">Allow notifications</button>
       <button class="btn-sm" onclick="dismissNotifPrompt()" style="margin-left:8px">Not now</button>
+    </div>
+  </div>
+
+  <!-- App password setup prompt -->
+  <div class="notif-prompt" id="password-setup-prompt" style="background:var(--amber-lt);border-color:var(--border);">
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:var(--amber)">Secure your investment records</div>
+      <div style="font-size:12.5px;color:var(--text2);line-height:1.5;margin-bottom:10px">Set up a simple app password to lock your diary on launch. It is optional but highly recommended. Keep it safe, as local passwords cannot be recovered.</div>
+      <button class="btn-sm" onclick="setUpAppPassword()" style="background:var(--amber);color:white;border-color:var(--amber)">Set Password</button>
+      <button class="btn-sm" onclick="dismissPasswordPrompt()" style="margin-left:8px">Not now</button>
     </div>
   </div>
 
@@ -289,6 +315,10 @@
     <button class="btn-sm" id="notif-toggle-btn" onclick="toggleNotifications()">Enable</button>
   </div>
 
+  <div class="setting-row" id="app-pwd-row">
+    <!-- App Password setting controls dynamically injected here -->
+  </div>
+
   <hr>
   <div class="setting-row" style="border:none">
     <div><div class="s-label" style="color:var(--red)">Delete all data</div><div class="s-desc">Permanently remove all investments</div></div>
@@ -358,6 +388,25 @@
       <button class="btn btn-secondary" onclick="closePasswordModal()">Cancel</button>
       <button class="btn btn-primary" id="pwd-confirm-btn">Confirm</button>
     </div>
+  </div>
+</div>
+
+<!-- UNLOCK OVERLAY (STARTUP LOCK) -->
+<div id="unlock-overlay">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <div style="width: 72px; height: 72px; background: var(--accent-lt); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; border: 2px solid var(--accent)">
+      <img src="icons/icon-192.png" alt="Logo" style="width: 48px; height: 48px;">
+    </div>
+    <h2 style="font-family: 'Lora', serif; font-size: 24px; font-weight: 600; color: var(--text); margin-bottom: 4px;">Nivesh Diary</h2>
+    <p style="font-size: 13px; color: var(--muted);">Investment Record Book</p>
+  </div>
+  <div style="width: 100%; max-width: 300px;">
+    <div class="field" style="margin-bottom: 16px;">
+      <label style="text-align: center; display: block; margin-bottom: 8px; font-weight: 500;">Enter App Password</label>
+      <input type="password" id="unlock-pwd-input" placeholder="Password" style="text-align: center; font-size: 16px; padding: 12px; width: 100%;" onkeydown="if(event.key === 'Enter') verifyUnlockPassword()">
+    </div>
+    <button class="btn btn-primary" onclick="verifyUnlockPassword()" style="width: 100%; padding: 12px; font-size: 16px;">Unlock App</button>
+    <div id="unlock-error" style="color: var(--red); font-size: 13px; text-align: center; margin-top: 12px; min-height: 18px; font-weight: 500;"></div>
   </div>
 </div>
 

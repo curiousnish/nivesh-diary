@@ -474,3 +474,22 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
   color: white;
   border-color: var(--accent);
 }
+
+/* ── UNLOCK OVERLAY (STARTUP LOCK) ───────── */
+#unlock-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 10000;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+html.app-locked body > *:not(#unlock-overlay) {
+  display: none !important;
+}
+html.app-locked #unlock-overlay {
+  display: flex !important;
+}
