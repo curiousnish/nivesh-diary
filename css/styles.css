@@ -417,8 +417,9 @@ input, select, textarea, button { font-family: inherit; }
   position: fixed; bottom: 82px; left: 50%; transform: translateX(-50%) translateY(20px);
   background: var(--text); color: white; padding: 11px 22px;
   border-radius: var(--r); font-size: 14px; z-index: 400;
-  opacity: 0; transition: all 0.25s; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: all 0.25s; pointer-events: none;
   box-shadow: var(--shadow-lg);
+  max-width: 90%; text-align: center; overflow-wrap: anywhere;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
