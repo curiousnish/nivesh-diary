@@ -397,6 +397,61 @@ function renderList() {
     });
   }
 
+  // Render summary stats for filtered list
+  const activeRunningInvs = list.filter(i => i.status !== 'closed' && (daysLeft(i.maturity) === null || daysLeft(i.maturity) >= 0));
+  const maturedUnclosedInvs = list.filter(i => i.status !== 'closed' && daysLeft(i.maturity) !== null && daysLeft(i.maturity) < 0);
+  const closedInvs = list.filter(i => i.status === 'closed');
+
+  let investedVal = activeRunningInvs.reduce((s, i) => s + getInvestedPrincipal(i), 0);
+  let closedInvested = closedInvs.reduce((s, i) => s + getInvestedPrincipal(i), 0);
+
+  if (closedInvs.length > 0) {
+    investedVal += closedInvested;
+  }
+  if (activeRunningInvs.length === 0 && (maturedUnclosedInvs.length > 0 || closedInvs.length > 0)) {
+    investedVal = list.reduce((s, i) => s + getInvestedPrincipal(i), 0);
+  }
+
+  const expectedMatVal = list.reduce((s, i) => s + Number(i.matamt || i.principal || 0), 0);
+
+  const listStatsEl = document.getElementById('list-stats');
+  if (listStatsEl) {
+    const runningCount = activeRunningInvs.length;
+    const totalCount = list.length;
+    const maturedCount = maturedUnclosedInvs.length;
+    const closedCount = closedInvs.length;
+
+    let investedSub = `${runningCount} active investment${runningCount !== 1 ? 's' : ''}`;
+    if (runningCount === 0 && totalCount > 0) {
+      if (closedCount > 0 && maturedCount === 0) {
+        investedSub = `${closedCount} closed investment${closedCount !== 1 ? 's' : ''}`;
+      } else if (maturedCount > 0) {
+        investedSub = `${maturedCount} matured investment${maturedCount !== 1 ? 's' : ''}`;
+      } else {
+        investedSub = `${totalCount} investment${totalCount !== 1 ? 's' : ''}`;
+      }
+    }
+
+    const matAmtKnownCount = list.filter(i => i.matamt).length;
+    let expectedSub = `${totalCount} investment${totalCount !== 1 ? 's' : ''}`;
+    if (matAmtKnownCount > 0 && matAmtKnownCount < totalCount) {
+      expectedSub += ` (${matAmtKnownCount} known returns)`;
+    }
+
+    listStatsEl.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-lbl">Invested Portfolio</div>
+        <div class="stat-val green">${fmt(investedVal)}</div>
+        <div class="stat-sub">${investedSub}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Expected Maturity Amount</div>
+        <div class="stat-val green">${fmt(expectedMatVal)}</div>
+        <div class="stat-sub">${expectedSub}</div>
+      </div>
+    `;
+  }
+
   // Render to DOM
   document.getElementById('list-body').innerHTML = list.length
     ? list.map(i => invCard(i)).join('')
