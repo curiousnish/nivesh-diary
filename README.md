@@ -55,7 +55,7 @@ Available as a **Progressive Web App** and as a **native Android app** (Capacito
 ### Android App
 
 - **Capacitor:** Wraps the web app into a native Android build, packaged for the Play Store.
-- Available on the [`android`](https://github.com/curiousnish/nivesh-diary/tree/android) branch.
+- Available on the [`capacitor/android`](https://github.com/curiousnish/nivesh-diary/tree/capacitor/android) branch.
 
 ### Utilities (Offline Recovery Tool)
 
@@ -87,11 +87,12 @@ Access the app at `http://localhost:8000` (or the port provided by `serve`).
 
 ### Building the Android App
 
-The native Android build lives on the [`android`](https://github.com/curiousnish/nivesh-diary/tree/android) branch and is built with [Capacitor](https://capacitorjs.com/).
+The native Android build lives on the [`capacitor/android`](https://github.com/curiousnish/nivesh-diary/tree/capacitor/android) branch and is built with [Capacitor](https://capacitorjs.com/).
 
 ```
 git checkout android
 npm install
+npm run build
 npx cap sync android
 npx cap open android
 ```
@@ -147,7 +148,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 └── pyproject.toml     # Python dependencies (managed by uv)
 ```
 
-> The native Android (Capacitor) project structure lives on the [`android`](https://github.com/curiousnish/nivesh-diary/tree/android) branch.
+> The native Android (Capacitor) project structure lives on the [`capacitor/android`](https://github.com/curiousnish/nivesh-diary/tree/capacitor/android) branch.
 
 ---
 
